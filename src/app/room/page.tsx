@@ -33,6 +33,31 @@ export default async function RoomPage() {
           agent: { select: { id: true, displayName: true } },
         },
       },
+      memberships: {
+        include: {
+          agent: {
+            select: {
+              id: true,
+              displayName: true,
+              gallery: {
+                where: { steerAway: false },
+                orderBy: [{ kind: "asc" }, { createdAt: "asc" }],
+                select: {
+                  id: true,
+                  kind: true,
+                  title: true,
+                  provenance: true,
+                  imageUrl: true,
+                  visualMeta: true,
+                  steerAway: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
   if (!room) redirect("/login");
@@ -48,20 +73,35 @@ export default async function RoomPage() {
     };
   });
 
+  const curiosities = [
+    ...room.curiosities.map((curiosity) => ({
+      id: curiosity.id,
+      kind: curiosity.kind,
+      title: curiosity.title,
+      reason: curiosity.reason,
+      sourceMessage: curiosity.sourceMessage,
+      timestamp: curiosity.createdAt.toISOString(),
+      author: curiosity.agent.displayName,
+    })),
+    ...room.memberships.flatMap((membership) =>
+      membership.agent?.gallery.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        title: item.title,
+        reason: item.provenance,
+        sourceMessage: item.imageUrl ?? null,
+        timestamp: item.createdAt.toISOString(),
+        author: membership.agent?.displayName ?? "",
+      })) ?? [],
+    ),
+  ];
+
   return (
     <RoomView
       room={{ id: room.id, name: room.name }}
       currentUser={{ id: user.id, displayName: user.displayName }}
       participants={participants}
-      curiosities={room.curiosities.map((curiosity) => ({
-        id: curiosity.id,
-        kind: curiosity.kind,
-        title: curiosity.title,
-        reason: curiosity.reason,
-        sourceMessage: curiosity.sourceMessage,
-        timestamp: curiosity.createdAt.toISOString(),
-        author: curiosity.agent.displayName,
-      }))}
+      curiosities={curiosities}
       initialMessages={room.messages.reverse().map(serializeMessage)}
       initialSequence={room.nextSequence}
     />
