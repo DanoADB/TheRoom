@@ -26,6 +26,11 @@ enum MessageSourceType {
   STATEMENT
 }
 
+enum GalleryItemKind {
+  INITIAL
+  INTERNET_IMAGE
+}
+
 model User {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String
@@ -70,6 +75,7 @@ model Agent {
   profile     AgentProfile?
   curiosity   AgentCuriosity?
   curiosities RoomCuriosity[]
+  gallery     AgentGalleryItem[]
 
   @@map("agents")
 }
@@ -117,15 +123,15 @@ model Room {
 }
 
 model RoomCuriosity {
-  id         String   @id @default(uuid()) @db.Uuid
-  roomId     String   @db.Uuid
-  agentId    String   @db.Uuid
-  kind       String   @db.VarChar(32)
-  title      String   @db.VarChar(140)
-  reason     String?  @db.VarChar(280)
+  id           String   @id @default(uuid()) @db.Uuid
+  roomId       String   @db.Uuid
+  agentId      String   @db.Uuid
+  kind         String   @db.VarChar(32)
+  title        String   @db.VarChar(140)
+  reason       String?  @db.VarChar(280)
   sourceMessage String? @db.Text
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -133,6 +139,35 @@ model RoomCuriosity {
   @@index([roomId, kind])
   @@index([agentId])
   @@map("room_curiosities")
+}
+
+model AgentGalleryItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  agentId     String   @db.Uuid
+  kind        GalleryItemKind @default(INITIAL)
+  title       String   @db.VarChar(140)
+  provenance  String   @db.VarChar(280)
+  imageUrl    String?
+  visualMeta  Json     @default("{}")
+  steerAway   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, kind])
+  @@index([agentId, steerAway])
+  @@map("agent_gallery_items")
+}
+
+model AgentCuriositiesView {
+  id        String   @id @default(uuid()) @db.Uuid
+  agentId   String   @db.Uuid
+  topic     String   @db.VarChar(100)
+  why       String   @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  @@ignore
 }
 
 model AgentRoomCursor {

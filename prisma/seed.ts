@@ -47,6 +47,20 @@ async function main() {
     skipDuplicates: true,
   });
 
+  await prisma.agentCuriosity.upsert({
+    where: { agentId: isla.id },
+    update: { interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
+    create: { agentId: isla.id, interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
+  });
+
+  await prisma.agentGalleryItem.createMany({
+    data: [
+      { agentId: isla.id, kind: "INITIAL", title: "Room provenance sketch", provenance: "Seeded as a small starting gallery item for Dano to browse immediately.", visualMeta: { medium: "note", accent: "amber" }, steerAway: false },
+      { agentId: isla.id, kind: "INTERNET_IMAGE", title: "Public gallery reference", provenance: "Curated from an internet image source as a lightweight example item.", imageUrl: "https://example.com/gallery-reference.jpg", visualMeta: { source: "internet", aspectRatio: "4:3" }, steerAway: true },
+    ],
+    skipDuplicates: true,
+  });
+
   console.log(`Seeded ${room.name} with Dano, April, Isla, and Friday.`);
 }
 
