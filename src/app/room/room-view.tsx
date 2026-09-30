@@ -30,6 +30,8 @@ type RoomCuriosity = {
   author: string;
 };
 
+const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
+
 export function RoomView({
   room,
   currentUser,
@@ -166,9 +168,23 @@ export function RoomView({
             <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">One room · {latestSequence} messages</p>
           </div>
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-            <span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
-            {connection}
+          <div className="flex items-center gap-4">
+            <a
+              href={OPENAI_USAGE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the OpenAI usage dashboard for TheRoom and Isla costs"
+              title="OpenAI Usage — filter to theRoom/Isla"
+              className="border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 transition hover:border-emerald-300/30 hover:text-emerald-200"
+            >
+              <span className="hidden sm:inline">Isla API cost </span>
+              <span className="sm:hidden">Cost </span>
+              <span aria-hidden="true">↗</span>
+            </a>
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+              <span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
+              <span className="hidden sm:inline">{connection}</span>
+            </div>
           </div>
         </header>
 
