@@ -27,6 +27,12 @@ export default async function RoomPage() {
           agent: { select: { id: true, displayName: true, type: true } },
         },
       },
+      curiosities: {
+        orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+        include: {
+          agent: { select: { id: true, displayName: true } },
+        },
+      },
     },
   });
   if (!room) redirect("/login");
@@ -47,6 +53,15 @@ export default async function RoomPage() {
       room={{ id: room.id, name: room.name }}
       currentUser={{ id: user.id, displayName: user.displayName }}
       participants={participants}
+      curiosities={room.curiosities.map((curiosity) => ({
+        id: curiosity.id,
+        kind: curiosity.kind,
+        title: curiosity.title,
+        reason: curiosity.reason,
+        sourceMessage: curiosity.sourceMessage,
+        timestamp: curiosity.createdAt.toISOString(),
+        author: curiosity.agent.displayName,
+      }))}
       initialMessages={room.messages.reverse().map(serializeMessage)}
       initialSequence={room.nextSequence}
     />

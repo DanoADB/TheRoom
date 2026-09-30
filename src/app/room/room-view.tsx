@@ -20,18 +20,28 @@ type Participant = {
   status: string;
 };
 
-const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
+type RoomCuriosity = {
+  id: string;
+  kind: string;
+  title: string;
+  reason: string | null;
+  sourceMessage: string | null;
+  timestamp: string;
+  author: string;
+};
 
 export function RoomView({
   room,
   currentUser,
   participants,
+  curiosities,
   initialMessages,
   initialSequence,
 }: {
   room: { id: string; name: string };
   currentUser: { id: string; displayName: string };
   participants: Participant[];
+  curiosities: RoomCuriosity[];
   initialMessages: RoomMessage[];
   initialSequence: number;
 }) {
@@ -129,6 +139,24 @@ export function RoomView({
             ))}
           </ul>
         </div>
+        <div className="mt-10 border-t border-white/10 pt-6">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/30">Curiosities / Decorations</p>
+          <ul className="mt-4 space-y-3 text-sm text-white/70">
+            {curiosities.length === 0 ? <li className="text-white/30">Nothing recorded yet.</li> : null}
+            {curiosities.map((item) => (
+              <li key={item.id} className="rounded-md border border-white/5 bg-white/[0.03] px-3 py-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-white/85">{item.title}</p>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">{item.kind}</span>
+                </div>
+                {item.reason ? <p className="mt-1 text-xs text-white/45">{item.reason}</p> : null}
+                <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
+                  {item.author} · {new Date(item.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
         <button onClick={logout} className="mt-auto text-left text-xs text-white/35 transition hover:text-white/70">Leave as {currentUser.displayName}</button>
       </aside>
 
@@ -138,23 +166,9 @@ export function RoomView({
             <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">One room · {latestSequence} messages</p>
           </div>
-          <div className="flex items-center gap-4">
-            <a
-              href={OPENAI_USAGE_URL}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open the OpenAI usage dashboard for TheRoom and Isla costs"
-              title="OpenAI Usage — filter to theRoom/Isla"
-              className="border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 transition hover:border-emerald-300/30 hover:text-emerald-200"
-            >
-              <span className="hidden sm:inline">Isla API cost </span>
-              <span className="sm:hidden">Cost </span>
-              <span aria-hidden="true">↗</span>
-            </a>
-            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-              <span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
-              <span className="hidden sm:inline">{connection}</span>
-            </div>
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+            <span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
+            {connection}
           </div>
         </header>
 
