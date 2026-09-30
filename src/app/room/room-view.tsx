@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type RoomMessage = {
@@ -99,6 +100,7 @@ export function RoomView({
   curiosities,
   initialMessages,
   initialSequence,
+  initialMobileView,
 }: {
   room: { id: string; name: string };
   currentUser: { id: string; displayName: string };
@@ -106,6 +108,7 @@ export function RoomView({
   curiosities: RoomCuriosity[];
   initialMessages: RoomMessage[];
   initialSequence: number;
+  initialMobileView: "room" | "gallery";
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
@@ -114,7 +117,7 @@ export function RoomView({
   const [connection, setConnection] = useState<"connected" | "reconnecting">("connected");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [mobileView, setMobileView] = useState<"room" | "gallery">("room");
+  const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
 
@@ -184,10 +187,19 @@ export function RoomView({
     router.refresh();
   }
 
+  function selectMobileView(view: "room" | "gallery") {
+    setMobileView(view);
+    window.history.replaceState(null, "", view === "gallery" ? "/room?view=gallery" : "/room");
+  }
+
   return (
     <main className="min-h-screen bg-[#090b0f] text-[#f4f1e8] lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="hidden border-r border-white/10 bg-[#0d1015] p-7 lg:flex lg:flex-col">
         <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/30">The Room</p>
+        <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
+          <Link href="/room" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Conversation</Link>
+          <Link href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Activity</Link>
+        </nav>
         <div className="mt-12">
           <p className="text-xs uppercase tracking-[0.18em] text-white/30">Present</p>
           <ul className="mt-5 space-y-4">
@@ -292,10 +304,10 @@ export function RoomView({
           </form>
         </footer>
 
-        <nav className="grid shrink-0 grid-cols-2 border-t border-white/10 bg-[#0d1015] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Room navigation">
+        <nav className="grid shrink-0 grid-cols-3 border-t border-white/10 bg-[#0d1015] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Room navigation">
           <button
             type="button"
-            onClick={() => setMobileView("room")}
+            onClick={() => selectMobileView("room")}
             aria-current={mobileView === "room" ? "page" : undefined}
             className={`flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "room" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
           >
@@ -306,7 +318,7 @@ export function RoomView({
           </button>
           <button
             type="button"
-            onClick={() => setMobileView("gallery")}
+            onClick={() => selectMobileView("gallery")}
             aria-current={mobileView === "gallery" ? "page" : undefined}
             className={`relative flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "gallery" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
           >
@@ -323,6 +335,15 @@ export function RoomView({
             </span>
             <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Gallery</span>
           </button>
+          <Link
+            href="/activity"
+            className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
+              <path d="M4 18V9m5 9V5m5 13v-7m5 7V3" strokeLinecap="round" />
+            </svg>
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Activity</span>
+          </Link>
         </nav>
       </section>
     </main>

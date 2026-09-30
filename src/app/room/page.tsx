@@ -5,9 +5,11 @@ import { MVP_ROOM_ID } from "@/lib/room-constants";
 import { serializeMessage } from "@/lib/room-api";
 import { RoomView } from "./room-view";
 
-export default async function RoomPage() {
+export default async function RoomPage({ searchParams }: PageProps<"/room">) {
   const user = await getCurrentHuman();
   if (!user) redirect("/login");
+  const query = await searchParams;
+  const initialMobileView = query.view === "gallery" ? "gallery" : "room";
 
   const room = await prisma.room.findFirst({
     where: { id: MVP_ROOM_ID, memberships: { some: { userId: user.id } } },
@@ -64,6 +66,7 @@ export default async function RoomPage() {
       }))}
       initialMessages={room.messages.reverse().map(serializeMessage)}
       initialSequence={room.nextSequence}
+      initialMobileView={initialMobileView}
     />
   );
 }
