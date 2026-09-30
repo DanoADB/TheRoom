@@ -36,6 +36,7 @@ type RoomCuriosity = {
 };
 
 const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
+const SCROLL_THRESHOLD_PX = 120;
 
 function formatTimestamp(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -141,9 +142,12 @@ export function RoomView({
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
   const [paceMode, setPaceMode] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
+  const autoScrollToBottomRef = useRef(true);
 
   const turnBoundaries = useMemo(() => getTurnBoundaryMessages(messages), [messages]);
   const latestHumanMessageId = useMemo(() => {
@@ -160,7 +164,30 @@ export function RoomView({
       return [...current, ...incoming.filter((message) => !known.has(message.id))].sort((a, b) => a.sequence - b.sequence);
     });
     sequenceRef.current = Math.max(sequenceRef.current, ...incoming.map((message) => message.sequence));
+    if (!autoScrollToBottomRef.current) setHasUnreadMessages(true);
   }, []);
+
+  const isNearBottom = useCallback(() => {
+    const container = transcriptRef.current;
+    if (!container) return true;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < SCROLL_THRESHOLD_PX;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    endRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
+
+  const syncScrollState = useCallback(() => {
+    const shouldStick = isNearBottom();
+    autoScrollToBottomRef.current = shouldStick;
+    if (shouldStick) setHasUnreadMessages(false);
+  }, [isNearBottom]);
+
+  const jumpToNewest = useCallback(() => {
+    autoScrollToBottomRef.current = true;
+    setHasUnreadMessages(false);
+    scrollToBottom("smooth");
+  }, [scrollToBottom]);
 
   const poll = useCallback(async () => {
     try {
@@ -186,8 +213,8 @@ export function RoomView({
   }, [poll]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: messages.length === initialMessages.length ? "auto" : "smooth" });
-  }, [messages.length, initialMessages.length]);
+    if (autoScrollToBottomRef.current) scrollToBottom(messages.length === initialMessages.length ? "auto" : "smooth");
+  }, [messages.length, initialMessages.length, scrollToBottom]);
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -208,6 +235,9 @@ export function RoomView({
       setContent("");
       for (const image of images) URL.revokeObjectURL(image.previewUrl);
       setImages([]);
+      autoScrollToBottomRef.current = true;
+      setHasUnreadMessages(false);
+      scrollToBottom("smooth");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Message could not be sent.");
     } finally {
@@ -343,7 +373,11 @@ export function RoomView({
           </div>
         </header>
 
-        <div className={`${mobileView === "room" ? "block" : "hidden"} flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:block`}>
+        <div
+          ref={transcriptRef}
+          onScroll={syncScrollState}
+          className={`${mobileView === "room" ? "block" : "hidden"} flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:block`}
+        >
           <div className="mx-auto max-w-3xl space-y-8">
             {messages.length === 0 ? (
               <div className="py-24 text-center">
@@ -432,9 +466,21 @@ export function RoomView({
                 </article>
               );
             })}
-            <div ref={bottomRef} />
+            <div ref={endRef} />
           </div>
         </div>
+
+        {hasUnreadMessages && !autoScrollToBottomRef.current ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center px-4 lg:bottom-28">
+            <button
+              type="button"
+              onClick={jumpToNewest}
+              className="pointer-events-auto rounded-full border border-emerald-300/25 bg-[#0d1015]/95 px-4 py-2 text-xs font-medium text-emerald-200 shadow-lg shadow-black/30 backdrop-blur transition hover:border-emerald-300/40 hover:bg-emerald-300/[0.08]"
+            >
+              New messages below — jump to newest
+            </button>
+          </div>
+        ) : null}
 
         <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery of Curiosity">
           <CuriosityGallery curiosities={curiosities} />
@@ -486,29 +532,29 @@ export function RoomView({
                   </svg>
                 </button>
                 <textarea
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-                onPaste={(event) => {
-                  const pastedImages = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-                  if (pastedImages.length) {
-                    event.preventDefault();
-                    addImages(pastedImages);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                rows={1}
-                maxLength={8_000}
-                placeholder={`Message as ${currentUser.displayName}…`}
-                className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-white/80 outline-none placeholder:text-white/25"
-              />
-              <button disabled={pending || (!content.trim() && images.length === 0)} className="h-11 bg-[#f4f1e8] px-5 text-xs font-bold uppercase tracking-[0.12em] text-[#0b0d10] transition hover:bg-white disabled:opacity-25">
-                {pending ? "Sending" : "Send"}
-              </button>
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  onPaste={(event) => {
+                    const pastedImages = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+                    if (pastedImages.length) {
+                      event.preventDefault();
+                      addImages(pastedImages);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  rows={1}
+                  maxLength={8_000}
+                  placeholder={`Message as ${currentUser.displayName}…`}
+                  className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-white/80 outline-none placeholder:text-white/25"
+                />
+                <button disabled={pending || (!content.trim() && images.length === 0)} className="h-11 bg-[#f4f1e8] px-5 text-xs font-bold uppercase tracking-[0.12em] text-[#0b0d10] transition hover:bg-white disabled:opacity-25">
+                  {pending ? "Sending" : "Send"}
+                </button>
               </div>
             </div>
             {error ? <p role="alert" className="mt-2 text-xs text-rose-300">{error}</p> : null}
@@ -546,10 +592,7 @@ export function RoomView({
             </span>
             <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Gallery</span>
           </button>
-          <Link
-            href="/activity"
-            className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65"
-          >
+          <Link href="/activity" className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
               <path d="M4 18V9m5 9V5m5 13v-7m5 7V3" strokeLinecap="round" />
             </svg>
