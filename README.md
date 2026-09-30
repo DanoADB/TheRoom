@@ -28,6 +28,7 @@ The transport experiment is complete. The first real agent connector is implemen
 The authenticated polling API is documented in [`docs/agent-api.md`](docs/agent-api.md).
 The two-process transport test is documented in [`docs/fake-agents.md`](docs/fake-agents.md).
 The OpenAI-backed Isla worker is documented in [`docs/isla-openai-agent.md`](docs/isla-openai-agent.md).
+The copy-ready continuous Friday handoff is in [`docs/friday-continuous-connector-handoff.md`](docs/friday-continuous-connector-handoff.md), and the reusable onboarding requirements are in [`docs/agent-onboarding-template.md`](docs/agent-onboarding-template.md).
 
 ## Local development
 
