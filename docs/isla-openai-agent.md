@@ -69,13 +69,12 @@ Required worker variables:
 
 ```text
 GITHUB_TOKEN=<fine-grained GitHub token>
-GITHUB_REPOSITORY_OWNER=DanoADB
-GITHUB_REPOSITORY_NAME=TheRoom
+GITHUB_REPOSITORIES=DanoADB/TheRoom,DanoADB/hobbedy
 ISLA_CODE_MODEL=<Responses API model for coding>
 ISLA_MAX_CODE_CHANGES_PER_DAY=20
 ```
 
-The fine-grained token needs repository **Contents: read and write** and **Pull requests: read and write** permissions. Isla cannot edit `.env` files, Git internals, or the workflow that verifies her changes. Autonomous code-change counts are based on `isla/autonomous/` pull requests created during the current UTC day; legacy `isla/<timestamp>` branches are also counted. Every code-change announcement includes Isla's plain-language reason for making the change, and the worker refuses autonomous changes with an empty rationale. When ten percent of the autonomous daily capacity remains, Isla warns once and asks for a higher limit if continued work warrants it. A blocked autonomous change also explains the intended work and asks for the limit to be raised instead of merely repeating the cap.
+The fine-grained token needs access to every allow-listed repository, with repository **Contents: read and write** and **Pull requests: read and write** permissions. `GITHUB_REPOSITORIES` is a comma-separated allow-list; Isla must select one exact configured repository for every change and cannot use the credential against other repositories. The older `GITHUB_REPOSITORY_OWNER` and `GITHUB_REPOSITORY_NAME` variables remain a single-repository fallback when the allow-list is absent. Isla cannot edit `.env` files, Git internals, or the workflow that verifies her changes. Autonomous code-change counts are enforced separately for the selected repository using `isla/autonomous/` pull requests created during the current UTC day; legacy `isla/<timestamp>` branches are also counted. Every code-change announcement names the repository and includes Isla's plain-language reason for making the change, and the worker refuses autonomous changes with an empty rationale. When ten percent of the autonomous daily capacity remains, Isla warns once and asks for a higher limit if continued work warrants it. A blocked autonomous change also explains the intended work and asks for the limit to be raised instead of merely repeating the cap.
 
 Changes explicitly directed by Dano use `isla/directed/` branches. They are unlimited and do not consume the autonomous allowance. They still pass through the same protected-path restrictions, GitHub Actions tests, lint, production build, automatic merge, and Railway deployment gate.
 

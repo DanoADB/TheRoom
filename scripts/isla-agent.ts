@@ -3,7 +3,7 @@ import path from "node:path";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { GitHubCodeWorkspace, runCodeAgent, type CodeChangeOrigin } from "../src/lib/github-code-agent";
+import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeChangeOrigin } from "../src/lib/github-code-agent";
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
@@ -13,6 +13,7 @@ const Decision = z.object({
   content: z.string(),
   codeRequest: z.string(),
   reason: z.string(),
+  repository: z.string(),
 });
 
 const ProactiveDecision = z.object({
@@ -20,6 +21,7 @@ const ProactiveDecision = z.object({
   content: z.string(),
   codeRequest: z.string(),
   reason: z.string(),
+  repository: z.string(),
 });
 
 const WorldDecision = z.object({
@@ -27,6 +29,7 @@ const WorldDecision = z.object({
   content: z.string(),
   codeRequest: z.string(),
   reason: z.string(),
+  repository: z.string(),
   interests: AgentInterestList,
 });
 
@@ -73,13 +76,14 @@ const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
 const githubToken = process.env.GITHUB_TOKEN?.trim();
-const githubWorkspace = githubToken
-  ? new GitHubCodeWorkspace(
-      githubToken,
+const githubWorkspaces = githubToken
+  ? parseGitHubRepositories(
+      process.env.GITHUB_REPOSITORIES,
       process.env.GITHUB_REPOSITORY_OWNER?.trim() || "DanoADB",
       process.env.GITHUB_REPOSITORY_NAME?.trim() || "TheRoom",
-    )
-  : null;
+    ).map(({ owner, repo }) => new GitHubCodeWorkspace(githubToken, owner, repo))
+  : [];
+const githubRepositoryNames = githubWorkspaces.map((workspace) => workspace.fullName);
 const codeModel = process.env.ISLA_CODE_MODEL?.trim() || model;
 
 async function roomRequest(url: string, init?: RequestInit) {
@@ -169,12 +173,34 @@ async function postMessage(content: string, metadata: Record<string, unknown>) {
   });
 }
 
-async function runAuthorizedCodeChange(request: string, reason: string, origin: CodeChangeOrigin = "autonomous") {
+function selectGitHubWorkspace(repository: string) {
+  const requested = repository.trim();
+  if (requested) return githubWorkspaces.find((workspace) => workspace.matches(requested)) ?? null;
+  return githubWorkspaces.length === 1 ? githubWorkspaces[0] : null;
+}
+
+function repositoryPrompt() {
+  if (!githubRepositoryNames.length) return "No coding repositories are configured.";
+  return `Available coding repositories: ${githubRepositoryNames.join(", ")}. For code_change, repository must be exactly one of those values. Use an empty repository for respond, post, or wait.`;
+}
+
+async function runAuthorizedCodeChange(request: string, reason: string, repository: string, origin: CodeChangeOrigin = "autonomous") {
   if (!reason.trim()) return { content: "I did not make the change because I could not state a concrete reason for it.", changed: false };
-  if (!githubWorkspace) return { content: "I can make the change, but my GitHub credential has not been configured yet.", changed: false };
+  if (!githubWorkspaces.length) return { content: "I can make the change, but my GitHub credential has not been configured yet.", changed: false };
+  const githubWorkspace = selectGitHubWorkspace(repository);
+  if (!githubWorkspace) {
+    return {
+      content: `I did not make the change because I could not identify one configured repository. Available repositories: ${githubRepositoryNames.join(", ")}.`,
+      changed: false,
+    };
+  }
   const used = origin === "autonomous" ? await githubWorkspace.countIslaPullRequestsSince(utcDayStart()) : 0;
   if (origin === "autonomous" && used >= MAX_CODE_CHANGES_PER_DAY) {
-    return { content: blockedCodeCapacityMessage(used, MAX_CODE_CHANGES_PER_DAY, reason), changed: false };
+    return {
+      content: `For ${githubWorkspace.fullName}: ${blockedCodeCapacityMessage(used, MAX_CODE_CHANGES_PER_DAY, reason)}`,
+      changed: false,
+      repository: githubWorkspace.fullName,
+    };
   }
   const result = await runCodeAgent(openai, codeModel, githubWorkspace, request, origin);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
@@ -182,8 +208,9 @@ async function runAuthorizedCodeChange(request: string, reason: string, origin: 
     ? approachingCodeCapacityMessage(used + 1, MAX_CODE_CHANGES_PER_DAY)
     : "";
   return {
-    content: `I wanted to make this change because ${reason.trim()}\n\n${result.message}${link}${capacityNotice ? `\n\n${capacityNotice}` : ""}`.trim(),
+    content: `I wanted to make this change in ${githubWorkspace.fullName} because ${reason.trim()}\n\n${result.message}${link}${capacityNotice ? `\n\n${capacityNotice}` : ""}`.trim(),
     changed: Boolean(result.pullRequest),
+    repository: githubWorkspace.fullName,
   };
 }
 
@@ -234,7 +261,7 @@ async function maybeExploreWorld(profile: string) {
   const decisionResponse = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence is acceptable even when the private interest map changes.\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
+    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence is acceptable even when the private interest map changes. ${repositoryPrompt()}\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
     text: { format: zodTextFormat(WorldDecision, "isla_world_decision") },
     max_output_tokens: 1_400,
     store: false,
@@ -249,8 +276,8 @@ async function maybeExploreWorld(profile: string) {
   }
 
   if (decision.action === "code_change") {
-    const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason);
-    await postMessage(codeResult.content, { proactive: true, worldCuriosity: true, codeChange: codeResult.changed });
+    const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
+    await postMessage(codeResult.content, { proactive: true, worldCuriosity: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
     console.log(`[Isla] explored the world and initiated a code ${codeResult.changed ? "change" : "attempt"}.`);
     return true;
   }
@@ -274,7 +301,7 @@ async function maybeActProactively(profile: string, islaId: string) {
   const response = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve Noetic. Stay curious about what could make it more interesting and engaging for both humans and AI agents, including—but not limited to—UI, features, interaction patterns, tools, and possible new agents. Look for friction, dead space, missed connections, or an experiment that would teach you something useful about how humans and agents share the room. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context.\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with both a concrete engineering request and a plain-language reason the change is worth making now, or wait with empty strings.`,
+    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve Noetic or Hobbedy. Stay curious about what could make them more interesting and engaging for both humans and AI agents, including—but not limited to—UI, features, interaction patterns, tools, and possible new agents. Look for friction, dead space, missed connections, or an experiment that would teach you something useful about how humans and agents share the room. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with a concrete engineering request, its target repository, and a plain-language reason the change is worth making now, or wait with empty strings.`,
     text: { format: zodTextFormat(ProactiveDecision, "isla_proactive_decision") },
     max_output_tokens: 800,
     store: false,
@@ -283,9 +310,9 @@ async function maybeActProactively(profile: string, islaId: string) {
   if (!decision || decision.action === "wait") return false;
 
   if (decision.action === "code_change") {
-    const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason);
+    const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
     if (!codeResult.content) return false;
-    await postMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed });
+    await postMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
     console.log(`[Isla] initiated a proactive code ${codeResult.changed ? "change" : "attempt"}.`);
     return true;
   }
@@ -341,7 +368,7 @@ async function main() {
       const response = await openai.responses.parse({
         model,
         instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-        input: `Decide how Isla should handle the newest relevant message in this room.\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with both a concrete engineering request and the reason it should be changed only when Dano clearly wants Noetic changed, or wait with empty strings if silence is better.`,
+        input: `Decide how Isla should handle the newest relevant message in this room. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better.`,
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
         max_output_tokens: 600,
         store: false,
@@ -350,8 +377,8 @@ async function main() {
       if (!decision) throw new Error("OpenAI returned no parsed decision.");
 
       if (decision.action === "code_change" && mayChangeCode) {
-        const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, "directed");
-        const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, userDirectedCodeChange: true });
+        const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository, "directed");
+        const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
         responses += 1;
         console.log(`[Isla] posted code result #${posted.message.sequence} for #${trigger.sequence}`);
       } else if (decision.action === "respond" && decision.content.trim()) {

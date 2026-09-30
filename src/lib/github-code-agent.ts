@@ -14,6 +14,30 @@ const ChangeSet = z.object({
 type RepoItem = { name: string; path: string; type: string };
 type GitHubResponse = Record<string, unknown>;
 export type CodeChangeOrigin = "autonomous" | "directed";
+export type GitHubRepositoryConfig = { owner: string; repo: string };
+
+const REPOSITORY_PART = /^[A-Za-z0-9_.-]+$/;
+
+export function parseGitHubRepositories(
+  value: string | undefined,
+  fallbackOwner = "DanoADB",
+  fallbackRepo = "TheRoom",
+) {
+  const entries = value?.trim() ? value.split(",") : [`${fallbackOwner}/${fallbackRepo}`];
+  const repositories = entries.map((entry) => {
+    const parts = entry.trim().split("/");
+    if (parts.length !== 2 || !parts.every((part) => REPOSITORY_PART.test(part))) {
+      throw new Error(`Invalid GitHub repository ${entry}. Use comma-separated owner/repository values.`);
+    }
+    return { owner: parts[0], repo: parts[1] };
+  });
+  const unique = new Map<string, GitHubRepositoryConfig>();
+  for (const repository of repositories) {
+    const key = `${repository.owner}/${repository.repo}`.toLowerCase();
+    if (!unique.has(key)) unique.set(key, repository);
+  }
+  return [...unique.values()];
+}
 
 export function isAutonomousIslaBranch(branch: string) {
   return branch.startsWith("isla/autonomous/") || /^isla\/\d{14}-/.test(branch);
@@ -36,6 +60,15 @@ export class GitHubCodeWorkspace {
     private readonly repo: string,
     private readonly baseBranch = "main",
   ) {}
+
+  get fullName() {
+    return `${this.owner}/${this.repo}`;
+  }
+
+  matches(value: string) {
+    const normalized = value.trim().toLowerCase();
+    return normalized === this.fullName.toLowerCase() || normalized === this.repo.toLowerCase();
+  }
 
   private async request(path: string, init?: RequestInit) {
     const response = await fetch(`${this.api}${path}`, {
@@ -187,7 +220,7 @@ export async function runCodeAgent(
   while (true) {
     const response = await openai.responses.create({
       model,
-      instructions: `You are Isla's coding capability for Noetic (the TheRoom codebase). Inspect the repository before editing. Make the smallest coherent change that satisfies the request. Preserve existing architecture and user work. You may not edit secrets, .env files, Git internals, or CI workflows. Submit complete file contents only after checking every affected file and its relevant dependencies. The resulting pull request is automatically tested and merged to production if checks pass. Never submit speculative or cosmetic churn.`,
+      instructions: `You are Isla's coding capability for ${workspace.fullName}. Inspect the repository before editing. Make the smallest coherent change that satisfies the request. Preserve existing architecture and user work. You may not edit secrets, .env files, Git internals, or CI workflows. Submit complete file contents only after checking every affected file and its relevant dependencies. The resulting pull request is automatically tested and merged to production if checks pass. Never submit speculative or cosmetic churn.`,
       input,
       tools,
       store: false,
