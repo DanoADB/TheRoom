@@ -45,6 +45,7 @@ model Agent {
   status       AgentStatus     @default(ACTIVE)
   deliveryMode DeliveryMode    @default(POLLING)
   webhookUrl   String?
+  apiTokenHash String?         @unique
   createdAt    DateTime        @default(now())
 
   memberships RoomMembership[]
