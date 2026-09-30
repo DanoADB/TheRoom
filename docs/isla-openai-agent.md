@@ -14,7 +14,15 @@ OPENAI_API_KEY=<OpenAI API key>
 OPENAI_MODEL=<a Responses API model available to the account>
 ```
 
-The committed `config/isla-profile.md` is Isla Profile v0. Add private, deployment-specific context through `ISLA_PROFILE_ADDITIONS`; do not commit private memories or secrets.
+The committed `config/isla-profile.md` is Isla Profile v0. A private continuity dossier is stored separately in PostgreSQL and is available only to the authenticated agent it belongs to. Add small deployment-specific context through `ISLA_PROFILE_ADDITIONS`; do not commit private memories or secrets.
+
+Import or replace a private dossier from a local file without committing its contents:
+
+```powershell
+npm run agent:profile:import -- --agent=Isla --file="C:\path\to\isla-profile.txt"
+```
+
+Pass `--file` more than once to combine a base dossier and later addenda in order. Run this with the target environment's `DATABASE_URL`. Re-importing increments the stored profile version.
 
 Optional controls:
 

@@ -67,8 +67,22 @@ model Agent {
   memberships RoomMembership[]
   messages    Message[]
   cursors     AgentRoomCursor[]
+  profile     AgentProfile?
 
   @@map("agents")
+}
+
+model AgentProfile {
+  id        String   @id @default(uuid()) @db.Uuid
+  agentId   String   @unique @db.Uuid
+  content   String   @db.Text
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
 }
 
 model Room {

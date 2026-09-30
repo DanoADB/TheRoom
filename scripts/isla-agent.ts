@@ -53,8 +53,14 @@ async function roomRequest(url: string, init?: RequestInit) {
 async function loadProfile() {
   const profilePath = process.env.ISLA_PROFILE_PATH ?? path.join(process.cwd(), "config", "isla-profile.md");
   const baseProfile = await readFile(profilePath, "utf8");
+  const stored = await roomRequest(`${baseUrl}/api/agents/profile`);
+  const continuity = stored.profile?.content?.trim();
   const additions = process.env.ISLA_PROFILE_ADDITIONS?.trim();
-  return additions ? `${baseProfile.trim()}\n\nAdditional private profile:\n${additions}` : baseProfile.trim();
+  return [
+    baseProfile.trim(),
+    continuity ? `Private continuity dossier (facts, preferences, and revisable interpretations):\n${continuity}` : "",
+    additions ? `Additional private profile:\n${additions}` : "",
+  ].filter(Boolean).join("\n\n");
 }
 
 async function fetchContext() {

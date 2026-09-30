@@ -11,6 +11,7 @@
     "agent:isla": "tsx scripts/fake-agent.ts --agent=isla",
     "agent:friday": "tsx scripts/fake-agent.ts --agent=friday",
     "agent:isla:openai": "tsx scripts/isla-agent.ts",
+    "agent:profile:import": "tsx scripts/import-agent-profile.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
