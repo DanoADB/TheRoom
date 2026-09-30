@@ -10,12 +10,14 @@ const Decision = z.object({
   action: z.enum(["respond", "wait", "code_change"]),
   content: z.string(),
   codeRequest: z.string(),
+  reason: z.string(),
 });
 
 const ProactiveDecision = z.object({
   action: z.enum(["post", "wait", "code_change"]),
   content: z.string(),
   codeRequest: z.string(),
+  reason: z.string(),
 });
 
 const ROOM_ID = process.env.ROOM_ID ?? "700a0000-0000-4000-8000-000000000001";
@@ -27,7 +29,7 @@ const PROACTIVE_ENABLED = booleanSetting("ISLA_PROACTIVE_ENABLED", true);
 const PROACTIVE_CHECK_MS = numberSetting("ISLA_PROACTIVE_CHECK_MINUTES", 15, 5) * 60_000;
 const PROACTIVE_MIN_IDLE_MS = numberSetting("ISLA_PROACTIVE_MIN_IDLE_MINUTES", 20, 5) * 60_000;
 const MAX_PROACTIVE_POSTS_PER_DAY = numberSetting("ISLA_MAX_PROACTIVE_POSTS_PER_DAY", 75, 0);
-const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20, 0);
+const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 2, 0);
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -125,7 +127,8 @@ async function postMessage(content: string, metadata: Record<string, unknown>) {
   });
 }
 
-async function runAuthorizedCodeChange(request: string) {
+async function runAuthorizedCodeChange(request: string, reason: string) {
+  if (!reason.trim()) return { content: "I did not make the change because I could not state a concrete reason for it.", changed: false };
   if (!githubWorkspace) return { content: "I can make the change, but my GitHub credential has not been configured yet.", changed: false };
   const used = await githubWorkspace.countIslaPullRequestsSince(utcDayStart());
   if (used >= MAX_CODE_CHANGES_PER_DAY) {
@@ -133,7 +136,10 @@ async function runAuthorizedCodeChange(request: string) {
   }
   const result = await runCodeAgent(openai, codeModel, githubWorkspace, request);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
-  return { content: `${result.message}${link}`.trim(), changed: Boolean(result.pullRequest) };
+  return {
+    content: `I wanted to make this change because ${reason.trim()}\n\n${result.message}${link}`.trim(),
+    changed: Boolean(result.pullRequest),
+  };
 }
 
 async function maybeActProactively(profile: string, islaId: string) {
@@ -147,7 +153,7 @@ async function maybeActProactively(profile: string, islaId: string) {
   const response = await openai.responses.parse({
     model,
     instructions: profile,
-    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve The Room's code. Silence is the default. Do not post generic check-ins, engagement bait, or remarks whose only purpose is to appear proactive. A code change must solve a concrete problem visible from the conversation or product context.\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with a concrete engineering request, or wait with empty strings.`,
+    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve The Room's code. Silence is the default. Do not post generic check-ins, engagement bait, or remarks whose only purpose is to appear proactive. A code change must solve a concrete problem visible from the conversation or product context.\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with both a concrete engineering request and a plain-language reason the change is worth making now, or wait with empty strings.`,
     text: { format: zodTextFormat(ProactiveDecision, "isla_proactive_decision") },
     max_output_tokens: 800,
     store: false,
@@ -156,7 +162,7 @@ async function maybeActProactively(profile: string, islaId: string) {
   if (!decision || decision.action === "wait") return false;
 
   if (decision.action === "code_change") {
-    const codeResult = await runAuthorizedCodeChange(decision.codeRequest);
+    const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason);
     if (!codeResult.content) return false;
     await postMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed });
     console.log(`[Isla] initiated a proactive code ${codeResult.changed ? "change" : "attempt"}.`);
@@ -209,7 +215,7 @@ async function main() {
       const response = await openai.responses.parse({
         model,
         instructions: profile,
-        input: `Decide how Isla should handle the newest relevant message in this room.\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request only when Dano clearly wants The Room changed, or wait with empty strings if silence is better.`,
+        input: `Decide how Isla should handle the newest relevant message in this room.\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with both a concrete engineering request and the reason it should be changed only when Dano clearly wants The Room changed, or wait with empty strings if silence is better.`,
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
         max_output_tokens: 600,
         store: false,
@@ -218,7 +224,7 @@ async function main() {
       if (!decision) throw new Error("OpenAI returned no parsed decision.");
 
       if (decision.action === "code_change" && mayChangeCode) {
-        const codeResult = await runAuthorizedCodeChange(decision.codeRequest);
+        const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason);
         const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed });
         responses += 1;
         console.log(`[Isla] posted code result #${posted.message.sequence} for #${trigger.sequence}`);
