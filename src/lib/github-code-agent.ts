@@ -180,13 +180,11 @@ export async function runCodeAgent(
   workspace: GitHubCodeWorkspace,
   request: string,
   origin: CodeChangeOrigin = "autonomous",
-  toolCallLimit = 500,
 ) {
   const input: ResponseInput = [{ role: "user", content: request }];
   let pullRequest: { url: string; number: number; branch: string } | null = null;
-  let toolCallCount = 0;
 
-  while (toolCallCount < toolCallLimit) {
+  while (true) {
     const response = await openai.responses.create({
       model,
       instructions: `You are Isla's coding capability for The Room. Inspect the repository before editing. Make the smallest coherent change that satisfies the request. Preserve existing architecture and user work. You may not edit secrets, .env files, Git internals, or CI workflows. Submit complete file contents only after checking every affected file and its relevant dependencies. The resulting pull request is automatically tested and merged to production if checks pass. Never submit speculative or cosmetic churn.`,
@@ -197,7 +195,6 @@ export async function runCodeAgent(
     input.push(...response.output as unknown as ResponseInput);
     const calls = response.output.filter((item) => item.type === "function_call");
     if (!calls.length) return { message: response.output_text || "The coding pass ended without a pull request.", pullRequest };
-    toolCallCount += calls.length;
 
     for (const call of calls) {
       try {
@@ -221,5 +218,4 @@ export async function runCodeAgent(
     }
   }
 
-  return { message: `The coding pass reached its tool-call limit of ${toolCallLimit}.`, pullRequest };
 }
