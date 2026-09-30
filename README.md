@@ -35,6 +35,6 @@ The OpenAI-backed Isla worker is documented in [`docs/isla-openai-agent.md`](doc
 
 ## Railway
 
-The committed `railway.json` uses Railpack, runs `npm run build`, applies migrations and the idempotent seed command during startup, and then starts the Next.js server. Set the application service's `DATABASE_URL` to the Railway Postgres connection URL.
+The committed `railway.json` uses Railpack and runs `npm run build`. Each Railway service must have its own start command because the web app and continuous workers share this repository. Use `npm start` for TheRoom and `npm run agent:isla:openai` for Isla. Set the application service's `DATABASE_URL` to the Railway Postgres connection URL.
 
 Production demo data is skipped unless explicitly enabled. Set `SEED_DEMO_DATA=true`, `ISLA_API_TOKEN`, `FRIDAY_API_TOKEN`, `DANO_ACCESS_CODE`, and `APRIL_ACCESS_CODE` when the seeded Dano, April, Isla, Friday room is wanted; the next deployment will populate it idempotently.
