@@ -68,27 +68,26 @@ function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
         <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">Questions, fascinations, and strange little threads worth keeping.</p>
       </div>
 
-      {curiosities.length === 0 ? (
-        <div className="py-20 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.22em] text-white/25">The gallery is waiting</p>
-          <p className="mt-3 text-sm text-white/40">Nothing has caught the room&apos;s attention yet.</p>
-        </div>
-      ) : (
-        <ul className="grid gap-4 py-6 sm:grid-cols-2">
-          {curiosities.map((item) => (
-            <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
-                <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
-              </div>
-              {item.reason ? <p className="mt-4 text-sm leading-6 text-white/50">{item.reason}</p> : null}
-              <p className="mt-5 border-t border-white/5 pt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-                {item.author} · {formatTimestamp(item.timestamp)}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="grid gap-4 py-6 sm:grid-cols-2" aria-label="Seeded curiosities">
+        {curiosities.length === 0 ? (
+          <li className="col-span-full py-20 text-center">
+            <p className="font-mono text-xs uppercase tracking-[0.22em] text-white/25">The gallery is waiting</p>
+            <p className="mt-3 text-sm text-white/40">Nothing has caught the room&apos;s attention yet.</p>
+          </li>
+        ) : null}
+        {curiosities.map((item) => (
+          <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
+              <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
+            </div>
+            {item.reason ? <p className="mt-4 text-sm leading-6 text-white/50">{item.reason}</p> : null}
+            <p className="mt-5 border-t border-white/5 pt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
+              {item.author} · {formatTimestamp(item.timestamp)}
+            </p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
