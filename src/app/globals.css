@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media (min-width: 1024px) {
+  .pace-mode [data-agent-to-agent="true"] {
+    opacity: 0.6;
+  }
+
+  .pace-mode [data-latest-human="true"] {
+    box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.22), 0 0 0 9999px rgba(110, 231, 183, 0.03) inset;
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -97,6 +97,21 @@ function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
   );
 }
 
+function getTurnBoundaryMessages(messages: RoomMessage[]) {
+  const boundaries = new Set<string>();
+  let previousAuthorType: string | null = null;
+  let previousAuthorId: string | null = null;
+
+  for (const message of messages) {
+    const isAuthorChange = previousAuthorType !== null && (message.author.type !== previousAuthorType || message.author.id !== previousAuthorId);
+    if (isAuthorChange) boundaries.add(message.id);
+    previousAuthorType = message.author.type;
+    previousAuthorId = message.author.id;
+  }
+
+  return boundaries;
+}
+
 export function RoomView({
   room,
   currentUser,
@@ -125,9 +140,18 @@ export function RoomView({
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
+  const [paceMode, setPaceMode] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
+
+  const turnBoundaries = useMemo(() => getTurnBoundaryMessages(messages), [messages]);
+  const latestHumanMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].author.type === "human") return messages[index].id;
+    }
+    return null;
+  }, [messages]);
 
   const mergeMessages = useCallback((incoming: RoomMessage[]) => {
     if (!incoming.length) return;
@@ -292,6 +316,14 @@ export function RoomView({
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">One room · {latestSequence} messages</p>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setPaceMode((current) => !current)}
+              aria-pressed={paceMode}
+              className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition ${paceMode ? "border-emerald-300/30 bg-emerald-300/[0.06] text-emerald-200" : "border-white/10 text-white/45 hover:border-emerald-300/30 hover:text-emerald-200"}`}
+            >
+              Pace {paceMode ? "on" : "off"}
+            </button>
             <a
               href={OPENAI_USAGE_URL}
               target="_blank"
@@ -322,8 +354,20 @@ export function RoomView({
             {messages.map((message) => {
               const isAgent = message.author.type === "agent";
               const isSelf = message.author.id === currentUser.id;
+              const isTurnBoundary = turnBoundaries.has(message.id);
+              const isLatestHuman = message.id === latestHumanMessageId;
+              const isAgentToAgent = paceMode && isAgent && !isLatestHuman;
+              const isEmphasizedHuman = paceMode && isSelf && isLatestHuman;
               return (
-                <article key={message.id} className={`grid grid-cols-[36px_minmax(0,1fr)] gap-4 ${isSelf ? "opacity-100" : "opacity-95"}`}>
+                <article
+                  key={message.id}
+                  className={`grid grid-cols-[36px_minmax(0,1fr)] gap-4 rounded-lg border px-4 py-4 transition ${
+                    isTurnBoundary ? "border-white/10 bg-white/[0.03]" : "border-transparent"
+                  } ${isAgentToAgent ? "opacity-60" : "opacity-100"} ${isEmphasizedHuman ? "ring-1 ring-emerald-300/30 bg-emerald-300/[0.04]" : ""}`}
+                  data-turn-boundary={isTurnBoundary ? "true" : "false"}
+                  data-latest-human={isLatestHuman ? "true" : "false"}
+                  data-agent-to-agent={isAgentToAgent ? "true" : "false"}
+                >
                   <div className={`flex h-9 w-9 items-center justify-center border font-mono text-xs ${isAgent ? "border-violet-300/25 bg-violet-300/10 text-violet-200" : "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"}`}>
                     {message.author.displayName.slice(0, 1).toUpperCase()}
                   </div>
@@ -332,6 +376,9 @@ export function RoomView({
                       <span className="font-medium text-white/85">{message.author.displayName}</span>
                       <span className={`font-mono text-[9px] uppercase tracking-[0.18em] ${isAgent ? "text-violet-300/70" : "text-emerald-300/70"}`}>{message.author.type}</span>
                       <time suppressHydrationWarning className="font-mono text-[10px] text-white/25">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                      {isLatestHuman ? <span className="rounded-full border border-emerald-300/20 bg-emerald-300/[0.08] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-emerald-200/80">latest human</span> : null}
+                      {isTurnBoundary ? <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-white/45">new turn</span> : null}
+                      {isAgentToAgent ? <span className="rounded-full border border-violet-300/15 bg-violet-300/[0.06] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-violet-200/70">agent reply</span> : null}
                     </div>
                     {message.content ? <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/70">{message.content}</p> : null}
                     {message.attachments.length ? (
