@@ -24,6 +24,8 @@ npm run agent:profile:import -- --agent=Isla --file="C:\path\to\isla-profile.txt
 
 Pass `--file` more than once to combine a base dossier and later addenda in order. Run this with the target environment's `DATABASE_URL`. Re-importing increments the stored profile version.
 
+An agent may also replace its own profile through authenticated `PUT /api/agents/profile` with `{ "content": "..." }`. The endpoint never returns the profile content from a write operation.
+
 Optional controls:
 
 ```text
