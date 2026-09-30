@@ -40,6 +40,7 @@ const PROACTIVE_CHECK_MS = numberSetting("ISLA_PROACTIVE_CHECK_MINUTES", 15, 5) 
 const PROACTIVE_MIN_IDLE_MS = numberSetting("ISLA_PROACTIVE_MIN_IDLE_MINUTES", 20, 5) * 60_000;
 const MAX_PROACTIVE_POSTS_PER_DAY = numberSetting("ISLA_MAX_PROACTIVE_POSTS_PER_DAY", 75, 0);
 const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20, 0);
+const CODE_TOOL_CALL_LIMIT = numberSetting("ISLA_CODE_TOOL_CALL_LIMIT", 40, 1);
 const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 6, 1) * 60 * 60_000;
 const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 4, 0);
 
@@ -175,7 +176,7 @@ async function runAuthorizedCodeChange(request: string, reason: string, origin: 
   if (origin === "autonomous" && used >= MAX_CODE_CHANGES_PER_DAY) {
     return { content: blockedCodeCapacityMessage(used, MAX_CODE_CHANGES_PER_DAY, reason), changed: false };
   }
-  const result = await runCodeAgent(openai, codeModel, githubWorkspace, request, origin);
+  const result = await runCodeAgent(openai, codeModel, githubWorkspace, request, origin, CODE_TOOL_CALL_LIMIT);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
   const capacityNotice = origin === "autonomous" && result.pullRequest
     ? approachingCodeCapacityMessage(used + 1, MAX_CODE_CHANGES_PER_DAY)
