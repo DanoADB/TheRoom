@@ -12,6 +12,7 @@ type RoomMessage = {
   content: string;
   sourceType: string;
   metadata: unknown;
+  feedback?: { up: number; down: number; viewer: "up" | "down" | null };
 };
 
 type Participant = {
@@ -117,6 +118,8 @@ export function RoomView({
   const [connection, setConnection] = useState<"connected" | "reconnecting">("connected");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
@@ -185,6 +188,37 @@ export function RoomView({
     await fetch("/api/human/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
+  }
+
+  async function rateMessage(messageId: string, value: "up" | "down") {
+    if (pendingFeedback) return;
+    const previous = messages.find((message) => message.id === messageId)?.feedback ?? { up: 0, down: 0, viewer: null };
+    const nextViewer = previous.viewer === value ? null : value;
+    const nextFeedback = {
+      up: Math.max(0, previous.up - (previous.viewer === "up" ? 1 : 0) + (nextViewer === "up" ? 1 : 0)),
+      down: Math.max(0, previous.down - (previous.viewer === "down" ? 1 : 0) + (nextViewer === "down" ? 1 : 0)),
+      viewer: nextViewer,
+    };
+    setPendingFeedback(messageId);
+    setFeedbackError(null);
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, feedback: nextFeedback } : message));
+
+    try {
+      const response = await fetch(`/api/human/messages/${messageId}/feedback`, nextViewer ? {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: nextViewer }),
+      } : { method: "DELETE" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error?.message ?? "Feedback could not be saved.");
+      }
+    } catch (cause) {
+      setMessages((current) => current.map((message) => message.id === messageId ? { ...message, feedback: previous } : message));
+      setFeedbackError({ messageId, message: cause instanceof Error ? cause.message : "Feedback could not be saved." });
+    } finally {
+      setPendingFeedback(null);
+    }
   }
 
   function selectMobileView(view: "room" | "gallery") {
@@ -267,6 +301,37 @@ export function RoomView({
                       <time suppressHydrationWarning className="font-mono text-[10px] text-white/25">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                     </div>
                     <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/70">{message.content}</p>
+                    {isAgent ? (
+                      <div className="mt-3 flex items-center gap-1" aria-label={`Rate ${message.author.displayName}'s response`}>
+                        <button
+                          type="button"
+                          onClick={() => rateMessage(message.id, "up")}
+                          disabled={pendingFeedback === message.id}
+                          aria-label="Good response"
+                          aria-pressed={message.feedback?.viewer === "up"}
+                          title="Good response"
+                          className={`flex h-8 w-8 items-center justify-center border transition disabled:opacity-40 ${message.feedback?.viewer === "up" ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-200" : "border-transparent text-white/25 hover:border-white/10 hover:text-white/60"}`}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6">
+                            <path d="M7.5 20H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h2.5m0 10V10l4-7c1.7 0 3 1.3 3 3v2h3.9a2.6 2.6 0 0 1 2.5 3.2l-1.5 6.5a3 3 0 0 1-2.9 2.3h-9Z" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rateMessage(message.id, "down")}
+                          disabled={pendingFeedback === message.id}
+                          aria-label="Poor response"
+                          aria-pressed={message.feedback?.viewer === "down"}
+                          title="Poor response"
+                          className={`flex h-8 w-8 items-center justify-center border transition disabled:opacity-40 ${message.feedback?.viewer === "down" ? "border-rose-300/40 bg-rose-300/10 text-rose-200" : "border-transparent text-white/25 hover:border-white/10 hover:text-white/60"}`}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6">
+                            <path d="M7.5 4H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2.5m0-10v10l4 7c1.7 0 3-1.3 3-3v-2h3.9a2.6 2.6 0 0 0 2.5-3.2l-1.5-6.5A3 3 0 0 0 16.5 4h-9Z" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        {feedbackError?.messageId === message.id ? <span role="alert" className="ml-2 text-xs text-rose-300">{feedbackError.message}</span> : null}
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               );

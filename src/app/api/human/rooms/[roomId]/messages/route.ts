@@ -29,12 +29,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
         where: { roomId, sequence: { gt: after } },
         orderBy: { sequence: "asc" },
         take: 100,
-        include: authorInclude,
+        include: {
+          ...authorInclude,
+          feedback: { select: { userId: true, value: true } },
+        },
       }),
     ]);
     if (!room) throw new ApiError(404, "room_not_found", "Room not found.");
     return Response.json({
-      messages: messages.map(serializeMessage),
+      messages: messages.map((message) => serializeMessage(message, user.id)),
       latestSequence: room.nextSequence,
       hasMore: messages.length === 100 && messages.at(-1)?.sequence !== room.nextSequence,
     });

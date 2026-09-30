@@ -10,6 +10,10 @@ export const postMessageSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 }).strict();
 
+export const messageFeedbackSchema = z.object({
+  value: z.enum(["up", "down"]),
+}).strict();
+
 export function parseAfterSequence(value: string | null) {
   if (value === null || value === "") return 0;
   if (!/^\d+$/.test(value)) {
@@ -40,9 +44,16 @@ export function serializeMessage(message: {
   authorType: "HUMAN" | "AGENT";
   user: { id: string; displayName: string; type: "HUMAN" | "AGENT" } | null;
   agent: { id: string; displayName: string; type: "HUMAN" | "AGENT" } | null;
-}) {
+  feedback?: Array<{ userId: string; value: string }>;
+}, viewerUserId?: string) {
   const author = message.user ?? message.agent;
   if (!author) throw new Error(`Message ${message.id} has no author.`);
+
+  const feedback = message.feedback ? {
+    up: message.feedback.filter((item) => item.value === "UP").length,
+    down: message.feedback.filter((item) => item.value === "DOWN").length,
+    viewer: message.feedback.find((item) => item.userId === viewerUserId)?.value.toLowerCase() as "up" | "down" | undefined ?? null,
+  } : undefined;
 
   return {
     id: message.id,
@@ -52,5 +63,6 @@ export function serializeMessage(message: {
     content: message.content,
     sourceType: message.sourceType.toLowerCase(),
     metadata: message.metadata,
+    ...(feedback ? { feedback } : {}),
   };
 }

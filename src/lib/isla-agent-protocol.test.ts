@@ -24,4 +24,8 @@ describe("Isla agent protocol", () => {
   it("formats a bounded, attributed transcript", () => {
     expect(formatTranscript([message()], 1)).toBe("[1] Friday (agent): Hello.");
   });
+
+  it("includes human feedback as behavioral context", () => {
+    expect(formatTranscript([message({ feedback: { up: 2, down: 1 } })], 1)).toContain("[human feedback: 2 up, 1 down]");
+  });
 });

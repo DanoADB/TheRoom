@@ -14,6 +14,7 @@ import {
 const authorInclude = {
   user: { select: { id: true, displayName: true, type: true } },
   agent: { select: { id: true, displayName: true, type: true } },
+  feedback: { select: { userId: true, value: true } },
 } satisfies Prisma.MessageInclude;
 
 export async function GET(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
@@ -36,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
     if (!room) throw new ApiError(404, "room_not_found", "Room not found.");
 
     return Response.json({
-      messages: messages.map(serializeMessage),
+      messages: messages.map((message) => serializeMessage(message)),
       latestSequence: room.nextSequence,
       hasMore: messages.length === 100 && messages.at(-1)?.sequence !== room.nextSequence,
     });

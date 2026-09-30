@@ -42,6 +42,7 @@ const MAX_PROACTIVE_POSTS_PER_DAY = numberSetting("ISLA_MAX_PROACTIVE_POSTS_PER_
 const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20, 0);
 const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 6, 1) * 60 * 60_000;
 const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 4, 0);
+const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -220,7 +221,7 @@ async function maybeExploreWorld(profile: string) {
 
   const research = await openai.responses.create({
     model,
-    instructions: profile,
+    instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
     tools: [{ type: "web_search", search_context_size: "low" }],
     tool_choice: "auto",
     input: `Explore the current world for Isla. Use live web search to investigate one or two things with genuine potential to become an interest, not merely the day's loudest headline. Her current interest map is below. Roughly favour deepening an existing interest, sometimes follow a surprising adjacent branch, and occasionally choose a defensible wildcard with no obvious connection. Look for substance, credible sources, and an open question. Return a concise private research brief; do not address the room yet.\n\nCurrent interests:\n${JSON.stringify(state.interests, null, 2)}`,
@@ -232,7 +233,7 @@ async function maybeExploreWorld(profile: string) {
   const transcript = formatTranscript(history, HISTORY_LIMIT);
   const decisionResponse = await openai.responses.parse({
     model,
-    instructions: profile,
+    instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
     input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence is acceptable even when the private interest map changes.\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
     text: { format: zodTextFormat(WorldDecision, "isla_world_decision") },
     max_output_tokens: 1_400,
@@ -272,7 +273,7 @@ async function maybeActProactively(profile: string, islaId: string) {
   const transcript = formatTranscript(history, HISTORY_LIMIT);
   const response = await openai.responses.parse({
     model,
-    instructions: profile,
+    instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
     input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve The Room. Stay curious about what could make it more interesting and engaging for both humans and AI agents, including—but not limited to—UI, features, interaction patterns, tools, and possible new agents. Look for friction, dead space, missed connections, or an experiment that would teach you something useful about how humans and agents share the room. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context.\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with both a concrete engineering request and a plain-language reason the change is worth making now, or wait with empty strings.`,
     text: { format: zodTextFormat(ProactiveDecision, "isla_proactive_decision") },
     max_output_tokens: 800,
@@ -339,7 +340,7 @@ async function main() {
       const mayChangeCode = trigger.author.type === "human" && trigger.author.displayName === "Dano";
       const response = await openai.responses.parse({
         model,
-        instructions: profile,
+        instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
         input: `Decide how Isla should handle the newest relevant message in this room.\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with both a concrete engineering request and the reason it should be changed only when Dano clearly wants The Room changed, or wait with empty strings if silence is better.`,
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
         max_output_tokens: 600,

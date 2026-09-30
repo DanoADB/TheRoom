@@ -52,4 +52,24 @@ describe("room API validation", () => {
       metadata: {},
     });
   });
+
+  it("summarizes feedback and identifies the current human's rating", () => {
+    expect(
+      serializeMessage({
+        id: "msg-2",
+        sequence: 2,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        content: "answer",
+        metadata: {},
+        sourceType: "STATEMENT",
+        authorType: "AGENT",
+        user: null,
+        agent: { id: "agent-1", displayName: "Isla", type: "AGENT" },
+        feedback: [
+          { userId: "dano", value: "UP" },
+          { userId: "april", value: "DOWN" },
+        ],
+      }, "dano").feedback,
+    ).toEqual({ up: 1, down: 1, viewer: "up" });
+  });
 });

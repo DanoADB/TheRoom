@@ -27,6 +27,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
         include: {
           user: { select: { id: true, displayName: true, type: true } },
           agent: { select: { id: true, displayName: true, type: true } },
+          feedback: { select: { userId: true, value: true } },
         },
       },
       curiosities: {
@@ -64,7 +65,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
         timestamp: curiosity.createdAt.toISOString(),
         author: curiosity.agent.displayName,
       }))}
-      initialMessages={room.messages.reverse().map(serializeMessage)}
+      initialMessages={room.messages.reverse().map((message) => serializeMessage(message, user.id))}
       initialSequence={room.nextSequence}
       initialMobileView={initialMobileView}
     />

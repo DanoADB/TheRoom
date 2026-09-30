@@ -31,6 +31,11 @@ enum GalleryItemKind {
   INTERNET_IMAGE
 }
 
+enum FeedbackValue {
+  UP
+  DOWN
+}
+
 model User {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String
@@ -41,6 +46,7 @@ model User {
   memberships RoomMembership[]
   messages    Message[]
   sessions    HumanSession[]
+  feedback    MessageFeedback[]
 
   @@map("users")
 }
@@ -94,14 +100,14 @@ model AgentProfile {
 }
 
 model AgentCuriosity {
-  id             String   @id @default(uuid()) @db.Uuid
-  agentId        String   @unique @db.Uuid
-  interests      Json     @default("[]")
+  id             String    @id @default(uuid()) @db.Uuid
+  agentId        String    @unique @db.Uuid
+  interests      Json      @default("[]")
   lastExploredAt DateTime?
   researchDay    String?
-  researchCount  Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  researchCount  Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
@@ -123,15 +129,15 @@ model Room {
 }
 
 model RoomCuriosity {
-  id           String   @id @default(uuid()) @db.Uuid
-  roomId       String   @db.Uuid
-  agentId      String   @db.Uuid
-  kind         String   @db.VarChar(32)
-  title        String   @db.VarChar(140)
-  reason       String?  @db.VarChar(280)
-  sourceMessage String? @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid()) @db.Uuid
+  roomId        String   @db.Uuid
+  agentId       String   @db.Uuid
+  kind          String   @db.VarChar(32)
+  title         String   @db.VarChar(140)
+  reason        String?  @db.VarChar(280)
+  sourceMessage String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -142,16 +148,16 @@ model RoomCuriosity {
 }
 
 model AgentGalleryItem {
-  id          String   @id @default(uuid()) @db.Uuid
-  agentId     String   @db.Uuid
-  kind        GalleryItemKind @default(INITIAL)
-  title       String   @db.VarChar(140)
-  provenance  String   @db.VarChar(280)
-  imageUrl    String?
-  visualMeta  Json     @default("{}")
-  steerAway   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String          @id @default(uuid()) @db.Uuid
+  agentId    String          @db.Uuid
+  kind       GalleryItemKind @default(INITIAL)
+  title      String          @db.VarChar(140)
+  provenance String          @db.VarChar(280)
+  imageUrl   String?
+  visualMeta Json            @default("{}")
+  steerAway  Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
@@ -216,13 +222,30 @@ model Message {
   metadata   Json              @default("{}")
   createdAt  DateTime          @default(now())
 
-  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user  User?  @relation(fields: [userId], references: [id], onDelete: Restrict)
-  agent Agent? @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  room     Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User?             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  agent    Agent?            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  feedback MessageFeedback[]
 
   @@unique([roomId, sequence])
   @@index([roomId, createdAt])
   @@index([userId])
   @@index([agentId])
   @@map("messages")
+}
+
+model MessageFeedback {
+  id        String        @id @default(uuid()) @db.Uuid
+  messageId String        @db.Uuid
+  userId    String        @db.Uuid
+  value     FeedbackValue
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId, createdAt])
+  @@map("message_feedback")
 }
