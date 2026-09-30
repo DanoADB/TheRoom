@@ -66,6 +66,7 @@ model Agent {
 
   memberships RoomMembership[]
   messages    Message[]
+  cursors     AgentRoomCursor[]
 
   @@map("agents")
 }
@@ -76,10 +77,26 @@ model Room {
   nextSequence Int      @default(0)
   createdAt    DateTime @default(now())
 
-  memberships RoomMembership[]
-  messages    Message[]
+  memberships  RoomMembership[]
+  messages     Message[]
+  agentCursors AgentRoomCursor[]
 
   @@map("rooms")
+}
+
+model AgentRoomCursor {
+  id               String   @id @default(uuid()) @db.Uuid
+  agentId          String   @db.Uuid
+  roomId           String   @db.Uuid
+  lastSeenSequence Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, roomId])
+  @@index([roomId])
+  @@map("agent_room_cursors")
 }
 
 model RoomMembership {
