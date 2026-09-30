@@ -32,6 +32,10 @@ type RoomCuriosity = {
 
 const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
 
+function formatTimestamp(timestamp: string) {
+  return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
   return (
     <div className="border-t border-white/10 pt-6">
@@ -46,7 +50,7 @@ function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
             </div>
             {item.reason ? <p className="mt-1 text-xs text-white/45">{item.reason}</p> : null}
             <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              {item.author} · {new Date(item.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {item.author} · {formatTimestamp(item.timestamp)}
             </p>
           </li>
         ))}
@@ -61,9 +65,7 @@ function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
       <div className="border-b border-white/10 pb-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Collected by the room</p>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery of Curiosity</h2>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">
-          Questions, fascinations, and strange little threads worth keeping.
-        </p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">Questions, fascinations, and strange little threads worth keeping.</p>
       </div>
 
       {curiosities.length === 0 ? (
@@ -77,13 +79,11 @@ function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
             <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
               <div className="flex items-start justify-between gap-4">
                 <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
-                <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">
-                  {item.kind}
-                </span>
+                <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
               </div>
               {item.reason ? <p className="mt-4 text-sm leading-6 text-white/50">{item.reason}</p> : null}
               <p className="mt-5 border-t border-white/5 pt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-                {item.author} · {new Date(item.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {item.author} · {formatTimestamp(item.timestamp)}
               </p>
             </li>
           ))}
