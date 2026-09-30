@@ -230,6 +230,10 @@ export function RoomView({
     });
   }
 
+  function togglePaceMode() {
+    setPaceMode((current) => !current);
+  }
+
   async function send(event: FormEvent) {
     event.preventDefault();
     const text = content.trim();
@@ -323,7 +327,7 @@ export function RoomView({
   }
 
   return (
-    <main className="min-h-screen bg-[#090b0f] text-[#f4f1e8] lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
+    <main className={`min-h-screen bg-[#090b0f] text-[#f4f1e8] lg:grid lg:grid-cols-[260px_minmax(0,1fr)] ${paceMode ? "pace-mode" : ""}`}>
       <aside className="hidden border-r border-white/10 bg-[#0d1015] p-7 lg:flex lg:flex-col">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-emerald-300/80">Noetic</p>
@@ -371,11 +375,17 @@ export function RoomView({
             </button>
             <button
               type="button"
-              onClick={() => setPaceMode((current) => !current)}
+              onClick={togglePaceMode}
               aria-pressed={paceMode}
-              className={`border px-2 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition sm:px-3 ${paceMode ? "border-emerald-300/30 bg-emerald-300/[0.06] text-emerald-200" : "border-white/10 text-white/45 hover:border-emerald-300/30 hover:text-emerald-200"}`}
+              title={paceMode ? "Pace on: make the transcript easier to follow" : "Pace off: show the transcript normally"}
+              aria-label={paceMode ? "Pace on, transcript easier to follow" : "Pace off, transcript shown normally"}
+              className={`group border px-2 py-2 text-left transition sm:px-3 ${paceMode ? "border-emerald-300/30 bg-emerald-300/[0.06] text-emerald-100" : "border-white/10 text-white/45 hover:border-emerald-300/30 hover:text-emerald-200"}`}
             >
-              Pace <span className="hidden sm:inline">{paceMode ? "on" : "off"}</span>
+              <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em]">
+                <span>Pace</span>
+                <span className={`rounded-full px-1.5 py-0.5 ${paceMode ? "bg-emerald-300/15 text-emerald-200" : "bg-white/5 text-white/40"}`}>{paceMode ? "on" : "off"}</span>
+              </span>
+              <span className="mt-1 block max-w-[11rem] text-[10px] leading-4 text-white/35 sm:max-w-none">{paceMode ? "Slows the transcript down so turns are easier to read." : "Normal transcript view."}</span>
             </button>
             <a
               href={OPENAI_USAGE_URL}
