@@ -180,7 +180,7 @@ export async function runCodeAgent(
   workspace: GitHubCodeWorkspace,
   request: string,
   origin: CodeChangeOrigin = "autonomous",
-  toolCallLimit = 40,
+  toolCallLimit = 500,
 ) {
   const input: ResponseInput = [{ role: "user", content: request }];
   let pullRequest: { url: string; number: number; branch: string } | null = null;
