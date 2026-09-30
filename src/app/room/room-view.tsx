@@ -12,8 +12,11 @@ type RoomMessage = {
   content: string;
   sourceType: string;
   metadata: unknown;
+  attachments: Array<{ id: string; fileName: string; mimeType: string; byteSize: number; url: string }>;
   feedback?: { up: number; down: number; viewer: "up" | "down" | null };
 };
+
+type PendingImage = { file: File; previewUrl: string };
 
 type Participant = {
   id: string;
@@ -115,6 +118,7 @@ export function RoomView({
   const [messages, setMessages] = useState(initialMessages);
   const [latestSequence, setLatestSequence] = useState(initialSequence);
   const [content, setContent] = useState("");
+  const [images, setImages] = useState<PendingImage[]>([]);
   const [connection, setConnection] = useState<"connected" | "reconnecting">("connected");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -122,6 +126,7 @@ export function RoomView({
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
 
   const mergeMessages = useCallback((incoming: RoomMessage[]) => {
@@ -163,25 +168,50 @@ export function RoomView({
   async function send(event: FormEvent) {
     event.preventDefault();
     const text = content.trim();
-    if (!text || pending) return;
+    if ((!text && images.length === 0) || pending) return;
     setPending(true);
     setError("");
     try {
-      const response = await fetch(`/api/human/rooms/${room.id}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, metadata: {} }),
-      });
+      const form = new FormData();
+      form.set("content", text);
+      form.set("metadata", "{}");
+      for (const image of images) form.append("images", image.file, image.file.name);
+      const response = await fetch(`/api/human/rooms/${room.id}/messages`, { method: "POST", body: form });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? "Message could not be sent.");
       mergeMessages([body.message]);
       setLatestSequence(body.message.sequence);
       setContent("");
+      for (const image of images) URL.revokeObjectURL(image.previewUrl);
+      setImages([]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Message could not be sent.");
     } finally {
       setPending(false);
     }
+  }
+
+  function addImages(files: File[]) {
+    const selected = files.filter((file) => file.type.startsWith("image/"));
+    if (!selected.length) return;
+    if (images.length + selected.length > 4) {
+      setError("Attach no more than 4 images to one message.");
+      return;
+    }
+    const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 5 * 1024 * 1024);
+    if (invalid) {
+      setError("Each image must be a JPEG, PNG, WebP, or GIF no larger than 5 MB.");
+      return;
+    }
+    setError("");
+    setImages((current) => [...current, ...selected.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
+  }
+
+  function removeImage(index: number) {
+    setImages((current) => {
+      URL.revokeObjectURL(current[index].previewUrl);
+      return current.filter((_, itemIndex) => itemIndex !== index);
+    });
   }
 
   async function logout() {
@@ -303,7 +333,23 @@ export function RoomView({
                       <span className={`font-mono text-[9px] uppercase tracking-[0.18em] ${isAgent ? "text-violet-300/70" : "text-emerald-300/70"}`}>{message.author.type}</span>
                       <time suppressHydrationWarning className="font-mono text-[10px] text-white/25">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/70">{message.content}</p>
+                    {message.content ? <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/70">{message.content}</p> : null}
+                    {message.attachments.length ? (
+                      <div className={`mt-3 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                        {message.attachments.map((attachment) => (
+                          <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="group block overflow-hidden border border-white/10 bg-black/20">
+                            {/* Authenticated, user-uploaded images are served through the Room's same-origin attachment route. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={attachment.url}
+                              alt={attachment.fileName || "Message attachment"}
+                              loading="lazy"
+                              className="max-h-[32rem] w-full object-contain transition duration-200 group-hover:opacity-90"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {isAgent ? (
                       <div className="mt-3 flex items-center gap-1" aria-label={`Rate ${message.author.displayName}'s response`}>
                         <button
@@ -349,10 +395,59 @@ export function RoomView({
 
         <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6 lg:block`}>
           <form onSubmit={send} className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-3 border border-white/10 bg-black/20 p-2 focus-within:border-white/25">
-              <textarea
+            <div className="border border-white/10 bg-black/20 focus-within:border-white/25">
+              {images.length ? (
+                <div className="grid grid-cols-4 gap-2 border-b border-white/10 p-2" aria-label="Images ready to send">
+                  {images.map((image, index) => (
+                    <div key={`${image.file.name}-${image.previewUrl}`} className="group relative aspect-square overflow-hidden border border-white/10 bg-black/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        aria-label={`Remove ${image.file.name}`}
+                        className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center bg-black/75 text-lg leading-none text-white/75 transition hover:text-white"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex items-end gap-2 p-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    addImages(Array.from(event.target.files ?? []));
+                    event.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={pending || images.length >= 4}
+                  aria-label="Attach pictures"
+                  title="Attach pictures"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center text-white/35 transition hover:bg-white/5 hover:text-white/70 disabled:opacity-20"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
+                    <path d="M8.5 12.5 13 8a3 3 0 1 1 4.2 4.2l-6.3 6.3a5 5 0 0 1-7.1-7.1l7-7a3.5 3.5 0 0 1 5 5l-6.4 6.4a2 2 0 0 1-2.8-2.8l5.7-5.7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <textarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
+                onPaste={(event) => {
+                  const pastedImages = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+                  if (pastedImages.length) {
+                    event.preventDefault();
+                    addImages(pastedImages);
+                  }
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -364,9 +459,10 @@ export function RoomView({
                 placeholder={`Message as ${currentUser.displayName}…`}
                 className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-white/80 outline-none placeholder:text-white/25"
               />
-              <button disabled={pending || !content.trim()} className="h-11 bg-[#f4f1e8] px-5 text-xs font-bold uppercase tracking-[0.12em] text-[#0b0d10] transition hover:bg-white disabled:opacity-25">
+              <button disabled={pending || (!content.trim() && images.length === 0)} className="h-11 bg-[#f4f1e8] px-5 text-xs font-bold uppercase tracking-[0.12em] text-[#0b0d10] transition hover:bg-white disabled:opacity-25">
                 {pending ? "Sending" : "Send"}
               </button>
+              </div>
             </div>
             {error ? <p role="alert" className="mt-2 text-xs text-rose-300">{error}</p> : null}
           </form>

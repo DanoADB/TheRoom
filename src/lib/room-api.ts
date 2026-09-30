@@ -26,7 +26,7 @@ export function parseAfterSequence(value: string | null) {
   return sequence;
 }
 
-export function parseResourceId(value: string, label: "room" | "agent") {
+export function parseResourceId(value: string, label: "room" | "agent" | "message" | "attachment") {
   const result = z.uuid().safeParse(value);
   if (!result.success) {
     throw new ApiError(400, `invalid_${label}_id`, `The ${label} ID must be a UUID.`);
@@ -45,6 +45,7 @@ export function serializeMessage(message: {
   user: { id: string; displayName: string; type: "HUMAN" | "AGENT" } | null;
   agent: { id: string; displayName: string; type: "HUMAN" | "AGENT" } | null;
   feedback?: Array<{ userId: string; value: string }>;
+  attachments?: Array<{ id: string; fileName: string; mimeType: string; byteSize: number; sortOrder: number }>;
 }, viewerUserId?: string) {
   const author = message.user ?? message.agent;
   if (!author) throw new Error(`Message ${message.id} has no author.`);
@@ -63,6 +64,15 @@ export function serializeMessage(message: {
     content: message.content,
     sourceType: message.sourceType.toLowerCase(),
     metadata: message.metadata,
+    attachments: (message.attachments ?? [])
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        byteSize: attachment.byteSize,
+        url: `/api/messages/${message.id}/attachments/${attachment.id}`,
+      })),
     ...(feedback ? { feedback } : {}),
   };
 }
