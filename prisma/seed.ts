@@ -20,6 +20,8 @@ async function main() {
   const productionSeed = process.env.NODE_ENV === "production";
   const islaToken = process.env.ISLA_API_TOKEN ?? (productionSeed ? undefined : "room_dev_isla_change_me");
   const fridayToken = process.env.FRIDAY_API_TOKEN ?? (productionSeed ? undefined : "room_dev_friday_change_me");
+  const danoAccessCode = process.env.DANO_ACCESS_CODE ?? (productionSeed ? undefined : "room_dev_dano_change_me");
+  const aprilAccessCode = process.env.APRIL_ACCESS_CODE ?? (productionSeed ? undefined : "room_dev_april_change_me");
 
   if (!islaToken || !fridayToken) {
     throw new Error("ISLA_API_TOKEN and FRIDAY_API_TOKEN are required when seeding production.");
@@ -28,8 +30,8 @@ async function main() {
   const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
   const [dano, april, isla, friday, room] = await Promise.all([
-    prisma.user.upsert({ where: { id: ids.dano }, update: { displayName: "Dano" }, create: { id: ids.dano, displayName: "Dano" } }),
-    prisma.user.upsert({ where: { id: ids.april }, update: { displayName: "April" }, create: { id: ids.april, displayName: "April" } }),
+    prisma.user.upsert({ where: { id: ids.dano }, update: { displayName: "Dano", ...(danoAccessCode ? { accessCodeHash: tokenHash(danoAccessCode) } : {}) }, create: { id: ids.dano, displayName: "Dano", accessCodeHash: danoAccessCode ? tokenHash(danoAccessCode) : null } }),
+    prisma.user.upsert({ where: { id: ids.april }, update: { displayName: "April", ...(aprilAccessCode ? { accessCodeHash: tokenHash(aprilAccessCode) } : {}) }, create: { id: ids.april, displayName: "April", accessCodeHash: aprilAccessCode ? tokenHash(aprilAccessCode) : null } }),
     prisma.agent.upsert({ where: { id: ids.isla }, update: { displayName: "Isla", apiTokenHash: tokenHash(islaToken) }, create: { id: ids.isla, displayName: "Isla", apiTokenHash: tokenHash(islaToken) } }),
     prisma.agent.upsert({ where: { id: ids.friday }, update: { displayName: "Friday", apiTokenHash: tokenHash(fridayToken) }, create: { id: ids.friday, displayName: "Friday", apiTokenHash: tokenHash(fridayToken) } }),
     prisma.room.upsert({ where: { id: ids.room }, update: { name: "Isla + Friday" }, create: { id: ids.room, name: "Isla + Friday" } }),
