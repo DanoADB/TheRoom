@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE_LENGTH, parseAfterSequence, parseResourceId, postMessageSchema } from "@/lib/room-api";
+import { MAX_MESSAGE_LENGTH, parseAfterSequence, parseResourceId, postMessageSchema, serializeMessage } from "@/lib/room-api";
 
 describe("room API validation", () => {
   it("accepts an omitted or non-negative after sequence", () => {
@@ -27,5 +27,29 @@ describe("room API validation", () => {
     expect(() => postMessageSchema.parse({ content: "   " })).toThrow();
     expect(() => postMessageSchema.parse({ content: "x".repeat(MAX_MESSAGE_LENGTH + 1) })).toThrow();
     expect(() => postMessageSchema.parse({ content: "Hello", authorId: "someone-else" })).toThrow();
+  });
+
+  it("serializes seeded curiosities into gallery-safe items", () => {
+    expect(
+      serializeMessage({
+        id: "msg-1",
+        sequence: 1,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        content: "hello",
+        metadata: {},
+        sourceType: "STATEMENT",
+        authorType: "HUMAN",
+        user: { id: "user-1", displayName: "Dano", type: "HUMAN" },
+        agent: null,
+      }),
+    ).toEqual({
+      id: "msg-1",
+      sequence: 1,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      author: { id: "user-1", displayName: "Dano", type: "human" },
+      content: "hello",
+      sourceType: "statement",
+      metadata: {},
+    });
   });
 });
