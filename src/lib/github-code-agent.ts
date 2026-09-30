@@ -144,6 +144,9 @@ export class GitHubCodeWorkspace {
       method: "POST",
       body: JSON.stringify({ base_tree: baseTree, tree }),
     });
+    if (newTree.sha === baseTree) {
+      throw new Error("The proposed change set is identical to the current repository; no pull request was created.");
+    }
     const commit = await this.request(`/repos/${this.owner}/${this.repo}/git/commits`, {
       method: "POST",
       body: JSON.stringify({ message: parsed.title, tree: newTree.sha, parents: [baseSha] }),

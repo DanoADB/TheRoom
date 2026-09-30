@@ -3,6 +3,7 @@ import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
 import { MVP_ROOM_ID } from "@/lib/room-constants";
 import { serializeMessage } from "@/lib/room-api";
+import { buildRoomGallery } from "@/lib/room-gallery";
 import { RoomView } from "./room-view";
 
 export default async function RoomPage({ searchParams }: PageProps<"/room">) {
@@ -18,7 +19,26 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
         orderBy: { joinedAt: "asc" },
         include: {
           user: { select: { id: true, displayName: true, type: true } },
-          agent: { select: { id: true, displayName: true, type: true, status: true } },
+          agent: {
+            select: {
+              id: true,
+              displayName: true,
+              type: true,
+              status: true,
+              gallery: {
+                where: { steerAway: false },
+                orderBy: { createdAt: "desc" },
+                select: {
+                  id: true,
+                  kind: true,
+                  title: true,
+                  provenance: true,
+                  imageUrl: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
         },
       },
       messages: {
@@ -51,20 +71,20 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
     };
   });
 
+  const galleryItems = room.memberships.flatMap((membership) =>
+    membership.agent?.gallery.map((item) => ({
+      ...item,
+      author: membership.agent!.displayName,
+    })) ?? [],
+  );
+  const curiosities = buildRoomGallery(room.curiosities, galleryItems);
+
   return (
     <RoomView
       room={{ id: room.id, name: room.name }}
       currentUser={{ id: user.id, displayName: user.displayName }}
       participants={participants}
-      curiosities={room.curiosities.map((curiosity) => ({
-        id: curiosity.id,
-        kind: curiosity.kind,
-        title: curiosity.title,
-        reason: curiosity.reason,
-        sourceMessage: curiosity.sourceMessage,
-        timestamp: curiosity.createdAt.toISOString(),
-        author: curiosity.agent.displayName,
-      }))}
+      curiosities={curiosities}
       initialMessages={room.messages.reverse().map((message) => serializeMessage(message, user.id))}
       initialSequence={room.nextSequence}
       initialMobileView={initialMobileView}
