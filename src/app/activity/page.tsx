@@ -94,7 +94,10 @@ export default async function ActivityPage() {
     <main className="min-h-screen bg-[#090b0f] text-[#f4f1e8] lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <ActivityRefresh />
       <aside className="hidden border-r border-white/10 bg-[#0d1015] p-7 lg:flex lg:flex-col">
-        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/30">The Room</p>
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-emerald-300/80">Noetic</p>
+          <p className="mt-2 text-[11px] text-white/25">A Hobbedy space</p>
+        </div>
         <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
           <Link href="/room" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Conversation</Link>
           <Link href="/activity" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Activity</Link>

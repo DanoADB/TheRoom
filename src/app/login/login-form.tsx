@@ -31,7 +31,7 @@ export function LoginForm({ users }: { users: Array<{ id: string; displayName: s
   }
 
   if (users.length === 0) {
-    return <p className="border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-100/80">The room has not been seeded yet.</p>;
+    return <p className="border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-100/80">Noetic has not been seeded yet.</p>;
   }
 
   return (
@@ -61,7 +61,7 @@ export function LoginForm({ users }: { users: Array<{ id: string; displayName: s
       </label>
       {error ? <p role="alert" className="text-sm text-rose-300">{error}</p> : null}
       <button disabled={pending || !userId} className="h-12 w-full bg-[#f4f1e8] font-semibold text-[#0b0d10] transition hover:bg-white disabled:cursor-wait disabled:opacity-50">
-        {pending ? "Opening…" : "Enter room"}
+        {pending ? "Opening…" : "Enter Noetic"}
       </button>
     </form>
   );
