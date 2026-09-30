@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ParticipantType {
+  HUMAN
+  AGENT
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DeliveryMode {
+  POLLING
+  WEBHOOK
+}
+
+enum MessageSourceType {
+  STATEMENT
+}
+
+model User {
+  id          String          @id @default(uuid()) @db.Uuid
+  displayName String
+  type        ParticipantType @default(HUMAN)
+  createdAt   DateTime        @default(now())
+
+  memberships RoomMembership[]
+  messages    Message[]
+
+  @@map("users")
+}
+
+model Agent {
+  id           String          @id @default(uuid()) @db.Uuid
+  displayName  String
+  type         ParticipantType @default(AGENT)
+  status       AgentStatus     @default(ACTIVE)
+  deliveryMode DeliveryMode    @default(POLLING)
+  webhookUrl   String?
+  createdAt    DateTime        @default(now())
+
+  memberships RoomMembership[]
+  messages    Message[]
+
+  @@map("agents")
+}
+
+model Room {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  nextSequence Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  memberships RoomMembership[]
+  messages    Message[]
+
+  @@map("rooms")
+}
+
+model RoomMembership {
+  id              String          @id @default(uuid()) @db.Uuid
+  roomId          String          @db.Uuid
+  participantType ParticipantType
+  userId          String?         @db.Uuid
+  agentId         String?         @db.Uuid
+  joinedAt        DateTime        @default(now())
+
+  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@unique([roomId, agentId])
+  @@index([userId])
+  @@index([agentId])
+  @@map("room_memberships")
+}
+
+model Message {
+  id         String            @id @default(uuid()) @db.Uuid
+  roomId     String            @db.Uuid
+  authorType ParticipantType
+  userId     String?           @db.Uuid
+  agentId    String?           @db.Uuid
+  content    String            @db.Text
+  sequence   Int
+  sourceType MessageSourceType @default(STATEMENT)
+  metadata   Json              @default("{}")
+  createdAt  DateTime          @default(now())
+
+  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  agent Agent? @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@unique([roomId, sequence])
+  @@index([roomId, createdAt])
+  @@index([userId])
+  @@index([agentId])
+  @@map("messages")
+}
