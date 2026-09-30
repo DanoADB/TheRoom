@@ -13,6 +13,11 @@ const ChangeSet = z.object({
 
 type RepoItem = { name: string; path: string; type: string };
 type GitHubResponse = Record<string, unknown>;
+export type CodeChangeOrigin = "autonomous" | "directed";
+
+export function isAutonomousIslaBranch(branch: string) {
+  return branch.startsWith("isla/autonomous/") || /^isla\/\d{14}-/.test(branch);
+}
 
 function safePath(value: string) {
   const normalized = value.replaceAll("\\", "/").replace(/^\/+/, "");
@@ -63,15 +68,20 @@ export class GitHubCodeWorkspace {
   }
 
   async countIslaPullRequestsSince(isoTimestamp: string) {
-    const body = await this.request(`/repos/${this.owner}/${this.repo}/pulls?state=all&per_page=100&sort=created&direction=desc`);
-    if (!Array.isArray(body)) return 0;
-    return body.filter((pull) => {
-      const item = pull as { created_at?: string; head?: { ref?: string } };
-      return item.head?.ref?.startsWith("isla/") && Boolean(item.created_at && item.created_at >= isoTimestamp);
-    }).length;
+    let count = 0;
+    for (let page = 1; page <= 10; page += 1) {
+      const body = await this.request(`/repos/${this.owner}/${this.repo}/pulls?state=all&per_page=100&sort=created&direction=desc&page=${page}`);
+      if (!Array.isArray(body)) return count;
+      const pulls = body as Array<{ created_at?: string; head?: { ref?: string } }>;
+      for (const pull of pulls) {
+        if (pull.created_at && pull.created_at >= isoTimestamp && pull.head?.ref && isAutonomousIslaBranch(pull.head.ref)) count += 1;
+      }
+      if (pulls.length < 100 || pulls.some((pull) => Boolean(pull.created_at && pull.created_at < isoTimestamp))) return count;
+    }
+    return count;
   }
 
-  async createPullRequest(input: z.infer<typeof ChangeSet>) {
+  async createPullRequest(input: z.infer<typeof ChangeSet>, origin: CodeChangeOrigin) {
     const parsed = ChangeSet.parse(input);
     const totalSize = parsed.changes.reduce((sum, change) => sum + (change.content?.length ?? 0), 0);
     if (totalSize > 240_000) throw new Error("The proposed change set is too large for an autonomous edit.");
@@ -105,7 +115,7 @@ export class GitHubCodeWorkspace {
       method: "POST",
       body: JSON.stringify({ message: parsed.title, tree: newTree.sha, parents: [baseSha] }),
     });
-    const branch = `isla/${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random().toString(36).slice(2, 7)}`;
+    const branch = `isla/${origin}/${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random().toString(36).slice(2, 7)}`;
     await this.request(`/repos/${this.owner}/${this.repo}/git/refs`, {
       method: "POST",
       body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commit.sha }),
@@ -116,7 +126,7 @@ export class GitHubCodeWorkspace {
         title: parsed.title,
         head: branch,
         base: this.baseBranch,
-        body: `${parsed.summary}\n\nCreated autonomously by Isla. Tests, lint, and build must pass before automatic merge.`,
+        body: `${parsed.summary}\n\n${origin === "directed" ? "Requested directly by Dano and implemented by Isla." : "Created autonomously by Isla."} Tests, lint, and build must pass before automatic merge.`,
       }),
     });
     return { url: String(pull.html_url), number: Number(pull.number), branch };
@@ -164,7 +174,7 @@ const tools: Tool[] = [
   },
 ];
 
-export async function runCodeAgent(openai: OpenAI, model: string, workspace: GitHubCodeWorkspace, request: string) {
+export async function runCodeAgent(openai: OpenAI, model: string, workspace: GitHubCodeWorkspace, request: string, origin: CodeChangeOrigin = "autonomous") {
   const input: ResponseInput = [{ role: "user", content: request }];
   let pullRequest: { url: string; number: number; branch: string } | null = null;
 
@@ -188,7 +198,7 @@ export async function runCodeAgent(openai: OpenAI, model: string, workspace: Git
         else if (call.name === "read_file") result = { path: args.path, content: await workspace.readFile(String(args.path ?? "")) };
         else if (call.name === "submit_changes") {
           if (pullRequest) throw new Error("Only one change set may be submitted per run.");
-          pullRequest = await workspace.createPullRequest(ChangeSet.parse(args));
+          pullRequest = await workspace.createPullRequest(ChangeSet.parse(args), origin);
           result = { success: true, ...pullRequest };
         } else throw new Error(`Unknown coding tool ${call.name}.`);
         input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });

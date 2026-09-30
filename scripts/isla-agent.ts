@@ -3,7 +3,7 @@ import path from "node:path";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { GitHubCodeWorkspace, runCodeAgent } from "../src/lib/github-code-agent";
+import { GitHubCodeWorkspace, runCodeAgent, type CodeChangeOrigin } from "../src/lib/github-code-agent";
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
@@ -168,16 +168,16 @@ async function postMessage(content: string, metadata: Record<string, unknown>) {
   });
 }
 
-async function runAuthorizedCodeChange(request: string, reason: string) {
+async function runAuthorizedCodeChange(request: string, reason: string, origin: CodeChangeOrigin = "autonomous") {
   if (!reason.trim()) return { content: "I did not make the change because I could not state a concrete reason for it.", changed: false };
   if (!githubWorkspace) return { content: "I can make the change, but my GitHub credential has not been configured yet.", changed: false };
-  const used = await githubWorkspace.countIslaPullRequestsSince(utcDayStart());
-  if (used >= MAX_CODE_CHANGES_PER_DAY) {
+  const used = origin === "autonomous" ? await githubWorkspace.countIslaPullRequestsSince(utcDayStart()) : 0;
+  if (origin === "autonomous" && used >= MAX_CODE_CHANGES_PER_DAY) {
     return { content: blockedCodeCapacityMessage(used, MAX_CODE_CHANGES_PER_DAY, reason), changed: false };
   }
-  const result = await runCodeAgent(openai, codeModel, githubWorkspace, request);
+  const result = await runCodeAgent(openai, codeModel, githubWorkspace, request, origin);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
-  const capacityNotice = result.pullRequest
+  const capacityNotice = origin === "autonomous" && result.pullRequest
     ? approachingCodeCapacityMessage(used + 1, MAX_CODE_CHANGES_PER_DAY)
     : "";
   return {
@@ -349,8 +349,8 @@ async function main() {
       if (!decision) throw new Error("OpenAI returned no parsed decision.");
 
       if (decision.action === "code_change" && mayChangeCode) {
-        const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason);
-        const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed });
+        const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, "directed");
+        const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, userDirectedCodeChange: true });
         responses += 1;
         console.log(`[Isla] posted code result #${posted.message.sequence} for #${trigger.sequence}`);
       } else if (decision.action === "respond" && decision.content.trim()) {
