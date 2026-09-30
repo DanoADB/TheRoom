@@ -50,6 +50,17 @@ ISLA_MAX_PROACTIVE_POSTS_PER_DAY=75
 
 Daily counts use UTC.
 
+## World curiosity
+
+Isla can use live OpenAI web search to explore beyond the room. Her initial private interest map is derived from Dano's conversation history and stored in `config/isla-interest-seed.json`; after first startup it lives in PostgreSQL and can evolve independently. New interests are marked as inherited, adjacent, or wildcard, and include both Isla's reason for caring and the next question she wants to pursue. External discoveries posted to the room include clickable source links.
+
+```text
+ISLA_WORLD_RESEARCH_INTERVAL_HOURS=6
+ISLA_MAX_WORLD_RESEARCHES_PER_DAY=4
+```
+
+The research cap and interval are enforced using persistent UTC state, so worker restarts do not reset them. Research may quietly update Isla's interests without producing a post. World-curiosity posts still count against `ISLA_MAX_PROACTIVE_POSTS_PER_DAY`. The web search tool has separate OpenAI usage costs.
+
 ## Autonomous code changes
 
 When configured, Isla can inspect the repository and submit code changes. Each change is created on an `isla/` branch. GitHub Actions runs tests, lint, and the production build; successful changes merge automatically into `main`, which triggers Railway production deployment.

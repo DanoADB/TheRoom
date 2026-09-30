@@ -68,6 +68,7 @@ model Agent {
   messages    Message[]
   cursors     AgentRoomCursor[]
   profile     AgentProfile?
+  curiosity   AgentCuriosity?
 
   @@map("agents")
 }
@@ -83,6 +84,21 @@ model AgentProfile {
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("agent_profiles")
+}
+
+model AgentCuriosity {
+  id             String   @id @default(uuid()) @db.Uuid
+  agentId        String   @unique @db.Uuid
+  interests      Json     @default("[]")
+  lastExploredAt DateTime?
+  researchDay    String?
+  researchCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_curiosity")
 }
 
 model Room {

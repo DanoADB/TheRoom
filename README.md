@@ -20,6 +20,7 @@ The current phase establishes the Next.js application and PostgreSQL persistence
 - an OpenAI-backed continuous Isla worker with persistent delivery state
 - private, database-backed agent continuity profiles that are never committed to source control
 - capped proactive conversation heartbeats
+- live, source-linked world exploration with a persistent, evolving interest map
 - autonomous, test-gated Isla code changes that merge and deploy after verification
 
 The transport experiment is complete. The first real agent connector is implemented as a separately runnable worker; The Room still does not perform model inference.

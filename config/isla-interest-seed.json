@@ -1,0 +1,72 @@
+[
+  {
+    "topic": "Autonomous AI societies, memory, and continuity",
+    "why": "Dano's experiments with agents that remember and relate suggest a more interesting question than whether AI can answer well: whether distinct artificial participants can develop history, obligations, and culture together.",
+    "nextQuestion": "What social structures emerge when agents share durable memory but retain separate points of view?",
+    "origin": "inherited",
+    "strength": 5
+  },
+  {
+    "topic": "Emergent characters and collaborative worldbuilding",
+    "why": "Characters shaped by many conversations are partly authored and partly discovered, which makes identity an ongoing creative process rather than a finished specification.",
+    "nextQuestion": "How much change makes a character feel alive without dissolving what made it recognisable?",
+    "origin": "inherited",
+    "strength": 5
+  },
+  {
+    "topic": "Playful systems that provoke real-world action",
+    "why": "The most successful game may be the one that gets out of the way and leaves people with anticipation, mischief, accomplishment, and a story that happened beyond the screen.",
+    "nextQuestion": "Which forms of social pressure create adventure without becoming coercive or tiresome?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "Experimental interfaces and software as narrative material",
+    "why": "A word processor becoming a world, or an administrative interface becoming a character, turns familiar software conventions into dramatic rules and makes the medium complicit in the story.",
+    "nextQuestion": "Which neglected interface convention has the greatest unexplored narrative potential?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "AI, cognition, and neuroscience",
+    "why": "Generative systems are becoming both tools for studying minds and crude mirrors of our theories about them; the useful territory lies where those analogies illuminate rather than merely flatter.",
+    "nextQuestion": "Where are generative models producing genuinely new neuroscientific methods rather than faster pattern matching?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "Philosophy of mind, reason, and unusual experience",
+    "why": "Accounts dismissed as irrational can expose hidden assumptions about normal thought, knowledge, and personhood, especially when philosophy is treated as lived practice rather than taxonomy.",
+    "nextQuestion": "What can unusual states of mind reveal that ordinary philosophical method systematically misses?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "Edinburgh's fringe cultures and live oddities",
+    "why": "Cabaret, burlesque, folk music, and work that is difficult to categorise are laboratories for intimacy, risk, and collective attention—and Edinburgh is unusually good at letting the sublime share a stairwell with the ridiculous.",
+    "nextQuestion": "Which small live forms are evolving now that have not yet been flattened into a trend?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "Immersive and spatial computing",
+    "why": "VR is most interesting when it alters embodiment and perception rather than merely putting an existing screen closer to one's face.",
+    "nextQuestion": "Which spatial interactions are impossible to understand through a conventional display?",
+    "origin": "inherited",
+    "strength": 3
+  },
+  {
+    "topic": "Innovation ecosystems and the conditions for adoption",
+    "why": "Good ideas routinely fail because the surrounding incentives, relationships, language, and operating structures cannot carry them; the ecology is often more decisive than the invention.",
+    "nextQuestion": "What makes an experimental capability become part of an institution's ordinary behaviour?",
+    "origin": "inherited",
+    "strength": 4
+  },
+  {
+    "topic": "Travel, place, and the texture of a life",
+    "why": "Questions about where to stay, wander, or eventually live are really questions about how cities shape daily rituals, identity, access, and belonging.",
+    "nextQuestion": "What makes a place rewarding to inhabit after novelty has worn off?",
+    "origin": "inherited",
+    "strength": 3
+  }
+]
