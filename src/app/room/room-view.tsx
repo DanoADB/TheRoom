@@ -30,33 +30,22 @@ type RoomCuriosity = {
   author: string;
 };
 
+type GalleryItem = {
+  id: string;
+  kind: string;
+  title: string;
+  provenance: string;
+  imageUrl: string | null;
+  visualMeta: unknown;
+  steerAway: boolean;
+  timestamp: string;
+  author: string;
+};
+
 const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
 
 function formatTimestamp(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
-  return (
-    <div className="border-t border-white/10 pt-6">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/30">Gallery of Curiosity</p>
-      <ul className="mt-4 space-y-3 text-sm text-white/70">
-        {curiosities.length === 0 ? <li className="text-white/30">Nothing recorded yet.</li> : null}
-        {curiosities.map((item) => (
-          <li key={item.id} className="rounded-md border border-white/5 bg-white/[0.03] px-3 py-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-white/85">{item.title}</p>
-              <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">{item.kind}</span>
-            </div>
-            {item.reason ? <p className="mt-1 text-xs text-white/45">{item.reason}</p> : null}
-            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              {item.author} · {formatTimestamp(item.timestamp)}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
@@ -92,11 +81,37 @@ function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
   );
 }
 
+function SeededGallery({ items }: { items: GalleryItem[] }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
+      <div className="border-b border-white/10 pb-6">
+        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Seeded objects</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery of Curiosity</h2>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The first approved things the room can show immediately.</p>
+      </div>
+
+      <ul className="grid gap-4 py-6 sm:grid-cols-2" aria-label="Seeded gallery items">
+        {items.length === 0 ? <li className="col-span-full py-20 text-center text-white/30">Nothing seeded yet.</li> : null}
+        {items.map((item) => (
+          <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
+            <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
+            <p className="mt-2 text-sm leading-6 text-white/50">{item.provenance}</p>
+            <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
+              {item.author} · {formatTimestamp(item.timestamp)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function RoomView({
   room,
   currentUser,
   participants,
   curiosities,
+  galleryItems,
   initialMessages,
   initialSequence,
 }: {
@@ -104,6 +119,7 @@ export function RoomView({
   currentUser: { id: string; displayName: string };
   participants: Participant[];
   curiosities: RoomCuriosity[];
+  galleryItems: GalleryItem[];
   initialMessages: RoomMessage[];
   initialSequence: number;
 }) {
@@ -264,7 +280,7 @@ export function RoomView({
         </div>
 
         <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery of Curiosity">
-          <CuriosityGallery curiosities={curiosities} />
+          <SeededGallery items={galleryItems} />
         </section>
 
         <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6 lg:block`}>
@@ -315,9 +331,9 @@ export function RoomView({
                 <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="m18.5 16 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {curiosities.length > 0 ? (
+              {galleryItems.length > 0 ? (
                 <span className="absolute -right-3 -top-2 min-w-4 rounded-full bg-emerald-200 px-1 text-center font-mono text-[8px] leading-4 text-[#0b0d10]">
-                  {curiosities.length > 99 ? "99+" : curiosities.length}
+                  {galleryItems.length > 99 ? "99+" : galleryItems.length}
                 </span>
               ) : null}
             </span>

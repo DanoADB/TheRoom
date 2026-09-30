@@ -33,6 +33,15 @@ export default async function RoomPage() {
           agent: { select: { id: true, displayName: true } },
         },
       },
+      agents: {
+        select: {
+          gallery: {
+            where: { steerAway: false },
+            orderBy: [{ kind: "asc" }, { createdAt: "asc" }],
+            take: 12,
+          },
+        },
+      },
     },
   });
   if (!room) redirect("/login");
@@ -48,6 +57,20 @@ export default async function RoomPage() {
     };
   });
 
+  const galleryItems = room.memberships
+    .flatMap((membership) => membership.agent?.gallery ?? [])
+    .map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      provenance: item.provenance,
+      imageUrl: item.imageUrl,
+      visualMeta: item.visualMeta,
+      steerAway: item.steerAway,
+      timestamp: item.createdAt.toISOString(),
+      author: room.memberships.find((membership) => membership.agent?.id === item.agentId)?.agent?.displayName ?? "Unknown",
+    }));
+
   return (
     <RoomView
       room={{ id: room.id, name: room.name }}
@@ -62,6 +85,7 @@ export default async function RoomPage() {
         timestamp: curiosity.createdAt.toISOString(),
         author: curiosity.agent.displayName,
       }))}
+      galleryItems={galleryItems}
       initialMessages={room.messages.reverse().map(serializeMessage)}
       initialSequence={room.nextSequence}
     />
