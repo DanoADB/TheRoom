@@ -9,6 +9,8 @@ const ids = {
   isla: "151a0000-0000-4000-8000-000000000003",
   friday: "f71da000-0000-4000-8000-000000000004",
   room: "700a0000-0000-4000-8000-000000000001",
+  galleryProvenance: "6a110000-0000-4000-8000-000000000001",
+  galleryReference: "6a110000-0000-4000-8000-000000000002",
 } as const;
 
 async function main() {
@@ -55,8 +57,8 @@ async function main() {
 
   await prisma.agentGalleryItem.createMany({
     data: [
-      { agentId: isla.id, kind: "INITIAL", title: "Room provenance sketch", provenance: "Seeded as a small starting gallery item for Dano to browse immediately.", visualMeta: { medium: "note", accent: "amber" }, steerAway: false },
-      { agentId: isla.id, kind: "INTERNET_IMAGE", title: "Public gallery reference", provenance: "Curated from an internet image source as a lightweight example item.", imageUrl: "https://example.com/gallery-reference.jpg", visualMeta: { source: "internet", aspectRatio: "4:3" }, steerAway: true },
+      { id: ids.galleryProvenance, agentId: isla.id, kind: "INITIAL", title: "Room provenance sketch", provenance: "Seeded as a small starting gallery item for Dano to browse immediately.", visualMeta: { medium: "note", accent: "amber" }, steerAway: false },
+      { id: ids.galleryReference, agentId: isla.id, kind: "INTERNET_IMAGE", title: "Public gallery reference", provenance: "Curated from an internet image source as a lightweight example item.", imageUrl: "https://example.com/gallery-reference.jpg", visualMeta: { source: "internet", aspectRatio: "4:3" }, steerAway: true },
     ],
     skipDuplicates: true,
   });
