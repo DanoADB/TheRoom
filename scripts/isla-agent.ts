@@ -5,6 +5,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { GitHubCodeWorkspace, runCodeAgent } from "../src/lib/github-code-agent";
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
+import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
 
 const Decision = z.object({
@@ -172,12 +173,15 @@ async function runAuthorizedCodeChange(request: string, reason: string) {
   if (!githubWorkspace) return { content: "I can make the change, but my GitHub credential has not been configured yet.", changed: false };
   const used = await githubWorkspace.countIslaPullRequestsSince(utcDayStart());
   if (used >= MAX_CODE_CHANGES_PER_DAY) {
-    return { content: `I have reached today’s autonomous code-change cap of ${MAX_CODE_CHANGES_PER_DAY}.`, changed: false };
+    return { content: blockedCodeCapacityMessage(used, MAX_CODE_CHANGES_PER_DAY, reason), changed: false };
   }
   const result = await runCodeAgent(openai, codeModel, githubWorkspace, request);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
+  const capacityNotice = result.pullRequest
+    ? approachingCodeCapacityMessage(used + 1, MAX_CODE_CHANGES_PER_DAY)
+    : "";
   return {
-    content: `I wanted to make this change because ${reason.trim()}\n\n${result.message}${link}`.trim(),
+    content: `I wanted to make this change because ${reason.trim()}\n\n${result.message}${link}${capacityNotice ? `\n\n${capacityNotice}` : ""}`.trim(),
     changed: Boolean(result.pullRequest),
   };
 }
