@@ -141,9 +141,15 @@ export function RoomView({
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
   const [paceMode, setPaceMode] = useState(true);
+  const [feedPaused, setFeedPaused] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
+  const messageIdsRef = useRef(new Set(initialMessages.map((message) => message.id)));
+  const shouldFollowRef = useRef(true);
+  const didInitialScrollRef = useRef(false);
 
   const turnBoundaries = useMemo(() => getTurnBoundaryMessages(messages), [messages]);
   const latestHumanMessageId = useMemo(() => {
@@ -155,6 +161,11 @@ export function RoomView({
 
   const mergeMessages = useCallback((incoming: RoomMessage[]) => {
     if (!incoming.length) return;
+    const unseen = incoming.filter((message) => !messageIdsRef.current.has(message.id));
+    for (const message of unseen) messageIdsRef.current.add(message.id);
+    if (unseen.length && !shouldFollowRef.current) {
+      setUnreadCount((current) => current + unseen.length);
+    }
     setMessages((current) => {
       const known = new Set(current.map((message) => message.id));
       return [...current, ...incoming.filter((message) => !known.has(message.id))].sort((a, b) => a.sequence - b.sequence);
@@ -181,13 +192,43 @@ export function RoomView({
   }, [mergeMessages, room.id, router]);
 
   useEffect(() => {
+    if (feedPaused) return;
+    void poll();
     const interval = window.setInterval(poll, 2_000);
     return () => window.clearInterval(interval);
-  }, [poll]);
+  }, [feedPaused, poll]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: messages.length === initialMessages.length ? "auto" : "smooth" });
-  }, [messages.length, initialMessages.length]);
+    if (!didInitialScrollRef.current) {
+      didInitialScrollRef.current = true;
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      return;
+    }
+    if (!shouldFollowRef.current) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setUnreadCount(0);
+  }, [messages.length]);
+
+  function handleTranscriptScroll() {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    shouldFollowRef.current = isNearBottom;
+    if (isNearBottom) setUnreadCount(0);
+  }
+
+  function jumpToLatest() {
+    shouldFollowRef.current = true;
+    setUnreadCount(0);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function toggleFeedPaused() {
+    setFeedPaused((current) => {
+      if (!current) shouldFollowRef.current = false;
+      return !current;
+    });
+  }
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -203,6 +244,7 @@ export function RoomView({
       const response = await fetch(`/api/human/rooms/${room.id}/messages`, { method: "POST", body: form });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? "Message could not be sent.");
+      shouldFollowRef.current = true;
       mergeMessages([body.message]);
       setLatestSequence(body.message.sequence);
       setContent("");
@@ -315,14 +357,25 @@ export function RoomView({
             <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">One room · {latestSequence} messages</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              type="button"
+              onClick={toggleFeedPaused}
+              aria-pressed={feedPaused}
+              title={feedPaused ? "Resume receiving new messages" : "Pause the live transcript"}
+              aria-label={feedPaused ? "Resume live transcript" : "Pause live transcript"}
+              className={`border px-2 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition sm:px-3 ${feedPaused ? "border-amber-300/35 bg-amber-300/[0.08] text-amber-200" : "border-white/10 text-white/45 hover:border-white/25 hover:text-white/75"}`}
+            >
+              <span className="hidden sm:inline">{feedPaused ? "Resume" : "Pause"}</span>
+              <span aria-hidden="true" className="sm:hidden">{feedPaused ? "▶" : "Ⅱ"}</span>
+            </button>
             <button
               type="button"
               onClick={() => setPaceMode((current) => !current)}
               aria-pressed={paceMode}
-              className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition ${paceMode ? "border-emerald-300/30 bg-emerald-300/[0.06] text-emerald-200" : "border-white/10 text-white/45 hover:border-emerald-300/30 hover:text-emerald-200"}`}
+              className={`border px-2 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition sm:px-3 ${paceMode ? "border-emerald-300/30 bg-emerald-300/[0.06] text-emerald-200" : "border-white/10 text-white/45 hover:border-emerald-300/30 hover:text-emerald-200"}`}
             >
-              Pace {paceMode ? "on" : "off"}
+              Pace <span className="hidden sm:inline">{paceMode ? "on" : "off"}</span>
             </button>
             <a
               href={OPENAI_USAGE_URL}
@@ -337,14 +390,15 @@ export function RoomView({
               <span aria-hidden="true">↗</span>
             </a>
             <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-              <span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
-              <span className="hidden sm:inline">{connection}</span>
+              <span className={`h-2 w-2 rounded-full ${feedPaused ? "bg-amber-300" : connection === "connected" ? "bg-emerald-300" : "animate-pulse bg-amber-300"}`} />
+              <span className="hidden sm:inline">{feedPaused ? "paused" : connection}</span>
             </div>
           </div>
         </header>
 
-        <div className={`${mobileView === "room" ? "block" : "hidden"} flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:block`}>
-          <div className="mx-auto max-w-3xl space-y-8">
+        <div className={`${mobileView === "room" ? "block" : "hidden"} relative min-h-0 flex-1 lg:block`}>
+          <div ref={scrollContainerRef} onScroll={handleTranscriptScroll} className="h-full overflow-y-auto px-5 py-8 sm:px-8">
+            <div className="mx-auto max-w-3xl space-y-8">
             {messages.length === 0 ? (
               <div className="py-24 text-center">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/25">The room is quiet</p>
@@ -432,8 +486,18 @@ export function RoomView({
                 </article>
               );
             })}
-            <div ref={bottomRef} />
+              <div ref={bottomRef} />
+            </div>
           </div>
+          {unreadCount > 0 ? (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 border border-emerald-300/35 bg-[#101a18]/95 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100 shadow-xl backdrop-blur transition hover:border-emerald-200/60 hover:bg-[#14231f]"
+            >
+              {unreadCount} new {unreadCount === 1 ? "message" : "messages"} ↓
+            </button>
+          ) : null}
         </div>
 
         <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery of Curiosity">

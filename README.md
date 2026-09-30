@@ -42,4 +42,4 @@ The copy-ready continuous Friday handoff is in [`docs/friday-continuous-connecto
 
 The committed `railway.json` uses Railpack and runs `npm run build`. Each Railway service must have its own start command because the web app and continuous workers share this repository. Use `npm start` for TheRoom and `npm run agent:isla:openai` for Isla. Set the application service's `DATABASE_URL` to the Railway Postgres connection URL.
 
-Production demo data is skipped unless explicitly enabled. Set `SEED_DEMO_DATA=true`, `ISLA_API_TOKEN`, `FRIDAY_API_TOKEN`, `DANO_ACCESS_CODE`, and `APRIL_ACCESS_CODE` when the seeded Dano, April, Isla, Friday room is wanted; the next deployment will populate it idempotently.
+Production demo data is skipped unless explicitly enabled. Set `SEED_DEMO_DATA=true`, `ISLA_API_TOKEN`, `FRIDAY_API_TOKEN`, `DANO_ACCESS_CODE`, `APRIL_ACCESS_CODE`, and `ANU_ACCESS_CODE` when the seeded Dano, April, Anu, Isla, Friday room is wanted; the next deployment will populate it idempotently.

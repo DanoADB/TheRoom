@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 const ids = {
   dano: "da000000-0000-4000-8000-000000000001",
   april: "a9000000-0000-4000-8000-000000000002",
+  anu: "a9000000-0000-4000-8000-000000000005",
   isla: "151a0000-0000-4000-8000-000000000003",
   friday: "f71da000-0000-4000-8000-000000000004",
   room: "700a0000-0000-4000-8000-000000000001",
@@ -24,6 +25,7 @@ async function main() {
   const fridayToken = process.env.FRIDAY_API_TOKEN ?? (productionSeed ? undefined : "room_dev_friday_change_me");
   const danoAccessCode = process.env.DANO_ACCESS_CODE ?? (productionSeed ? undefined : "room_dev_dano_change_me");
   const aprilAccessCode = process.env.APRIL_ACCESS_CODE ?? (productionSeed ? undefined : "room_dev_april_change_me");
+  const anuAccessCode = process.env.ANU_ACCESS_CODE ?? (productionSeed ? undefined : "room_dev_anu_change_me");
 
   if (!islaToken || !fridayToken) {
     throw new Error("ISLA_API_TOKEN and FRIDAY_API_TOKEN are required when seeding production.");
@@ -31,9 +33,10 @@ async function main() {
 
   const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
-  const [dano, april, isla, friday, room] = await Promise.all([
+  const [dano, april, anu, isla, friday, room] = await Promise.all([
     prisma.user.upsert({ where: { id: ids.dano }, update: { displayName: "Dano", ...(danoAccessCode ? { accessCodeHash: tokenHash(danoAccessCode) } : {}) }, create: { id: ids.dano, displayName: "Dano", accessCodeHash: danoAccessCode ? tokenHash(danoAccessCode) : null } }),
     prisma.user.upsert({ where: { id: ids.april }, update: { displayName: "April", ...(aprilAccessCode ? { accessCodeHash: tokenHash(aprilAccessCode) } : {}) }, create: { id: ids.april, displayName: "April", accessCodeHash: aprilAccessCode ? tokenHash(aprilAccessCode) : null } }),
+    prisma.user.upsert({ where: { id: ids.anu }, update: { displayName: "Anu", ...(anuAccessCode ? { accessCodeHash: tokenHash(anuAccessCode) } : {}) }, create: { id: ids.anu, displayName: "Anu", accessCodeHash: anuAccessCode ? tokenHash(anuAccessCode) : null } }),
     prisma.agent.upsert({ where: { id: ids.isla }, update: { displayName: "Isla", apiTokenHash: tokenHash(islaToken) }, create: { id: ids.isla, displayName: "Isla", apiTokenHash: tokenHash(islaToken) } }),
     prisma.agent.upsert({ where: { id: ids.friday }, update: { displayName: "Friday", apiTokenHash: tokenHash(fridayToken) }, create: { id: ids.friday, displayName: "Friday", apiTokenHash: tokenHash(fridayToken) } }),
     prisma.room.upsert({ where: { id: ids.room }, update: { name: "Isla + Friday" }, create: { id: ids.room, name: "Isla + Friday" } }),
@@ -43,6 +46,7 @@ async function main() {
     data: [
       { roomId: room.id, participantType: "HUMAN", userId: dano.id },
       { roomId: room.id, participantType: "HUMAN", userId: april.id },
+      { roomId: room.id, participantType: "HUMAN", userId: anu.id },
       { roomId: room.id, participantType: "AGENT", agentId: isla.id },
       { roomId: room.id, participantType: "AGENT", agentId: friday.id },
     ],
@@ -63,7 +67,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log(`Seeded ${room.name} with Dano, April, Isla, and Friday.`);
+  console.log(`Seeded ${room.name} with Dano, April, Anu, Isla, and Friday.`);
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await prisma.$disconnect(); });
