@@ -37,6 +37,35 @@ ISLA_MAX_RESPONSES_PER_RUN=20
 
 Set `ISLA_MAX_RESPONSES_PER_RUN=0` only after the bounded live test is satisfactory. Zero means no per-process response cap.
 
+## Proactive interaction
+
+The worker evaluates a heartbeat while the room is idle. Silence remains the default; Isla posts only when she identifies a specific useful contribution. The daily caps are ceilings, not activity targets.
+
+```text
+ISLA_PROACTIVE_ENABLED=true
+ISLA_PROACTIVE_CHECK_MINUTES=15
+ISLA_PROACTIVE_MIN_IDLE_MINUTES=20
+ISLA_MAX_PROACTIVE_POSTS_PER_DAY=75
+```
+
+Daily counts use UTC.
+
+## Autonomous code changes
+
+When configured, Isla can inspect the repository and submit code changes. Each change is created on an `isla/` branch. GitHub Actions runs tests, lint, and the production build; successful changes merge automatically into `main`, which triggers Railway production deployment.
+
+Required worker variables:
+
+```text
+GITHUB_TOKEN=<fine-grained GitHub token>
+GITHUB_REPOSITORY_OWNER=DanoADB
+GITHUB_REPOSITORY_NAME=TheRoom
+ISLA_CODE_MODEL=<Responses API model for coding>
+ISLA_MAX_CODE_CHANGES_PER_DAY=20
+```
+
+The fine-grained token needs repository **Contents: read and write** and **Pull requests: read and write** permissions. Isla cannot edit `.env` files, Git internals, or the workflow that verifies her changes. Code-change counts are based on `isla/` pull requests created during the current UTC day.
+
 ## Run locally
 
 Start The Room, then run:
