@@ -50,7 +50,31 @@ describe("room API validation", () => {
       content: "hello",
       sourceType: "statement",
       metadata: {},
+      attachments: [],
     });
+  });
+
+  it("serializes image attachments without exposing stored bytes", () => {
+    const message = serializeMessage({
+      id: "msg-3",
+      sequence: 3,
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      content: "look at this",
+      metadata: {},
+      sourceType: "STATEMENT",
+      authorType: "HUMAN",
+      user: { id: "user-1", displayName: "Dano", type: "HUMAN" },
+      agent: null,
+      attachments: [{ id: "image-1", fileName: "potato.png", mimeType: "image/png", byteSize: 42, sortOrder: 0 }],
+    });
+
+    expect(message.attachments).toEqual([{
+      id: "image-1",
+      fileName: "potato.png",
+      mimeType: "image/png",
+      byteSize: 42,
+      url: "/api/messages/msg-3/attachments/image-1",
+    }]);
   });
 
   it("summarizes feedback and identifies the current human's rating", () => {

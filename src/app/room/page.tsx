@@ -48,6 +48,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
           user: { select: { id: true, displayName: true, type: true } },
           agent: { select: { id: true, displayName: true, type: true } },
           feedback: { select: { userId: true, value: true } },
+          attachments: { select: { id: true, fileName: true, mimeType: true, byteSize: true, sortOrder: true } },
         },
       },
       curiosities: {

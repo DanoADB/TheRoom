@@ -179,9 +179,33 @@ function selectGitHubWorkspace(repository: string) {
   return githubWorkspaces.length === 1 ? githubWorkspaces[0] : null;
 }
 
+async function roomDecisionInput(text: string, trigger: RoomMessage) {
+  const content: Array<
+    | { type: "input_text"; text: string }
+    | { type: "input_image"; image_url: string; detail: "low" }
+  > = [{ type: "input_text", text }];
+  const viewable = (trigger.attachments ?? []).filter((attachment) =>
+    ["image/jpeg", "image/png", "image/webp"].includes(attachment.mimeType) && attachment.byteSize <= 5 * 1024 * 1024,
+  );
+
+  for (const attachment of viewable) {
+    const response = await fetch(`${baseUrl}${attachment.url}`, {
+      headers: { Authorization: `Bearer ${roomToken}` },
+    });
+    if (!response.ok) {
+      console.warn(`[Isla] could not load attached image ${attachment.id}: ${response.status}`);
+      continue;
+    }
+    const image = Buffer.from(await response.arrayBuffer()).toString("base64");
+    content.push({ type: "input_image", image_url: `data:${attachment.mimeType};base64,${image}`, detail: "low" });
+  }
+
+  return [{ role: "user" as const, content }];
+}
+
 function repositoryPrompt() {
   if (!githubRepositoryNames.length) return "No coding repositories are configured.";
-  return `Available coding repositories: ${githubRepositoryNames.join(", ")}. For code_change, repository must be exactly one of those values. Use an empty repository for respond, post, or wait.`;
+  return `Confirmed accessible coding repositories: ${githubRepositoryNames.join(", ")}. This list comes from the live worker configuration and is authoritative: do not claim that you cannot access or view a listed repository. When Dano asks you to inspect or change one, choose code_change so the coding capability can use its repository tools. For code_change, repository must be exactly one of those values. Use an empty repository for respond, post, or wait.`;
 }
 
 async function runAuthorizedCodeChange(request: string, reason: string, repository: string, origin: CodeChangeOrigin = "autonomous") {
@@ -365,10 +389,11 @@ async function main() {
       await sleep(RESPONSE_DELAY_MS);
       const transcript = formatTranscript(await fetchContext(), HISTORY_LIMIT);
       const mayChangeCode = trigger.author.type === "human" && trigger.author.displayName === "Dano";
+      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
       const response = await openai.responses.parse({
         model,
         instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-        input: `Decide how Isla should handle the newest relevant message in this room. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better.`,
+        input: await roomDecisionInput(decisionPrompt, trigger),
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
         max_output_tokens: 600,
         store: false,
