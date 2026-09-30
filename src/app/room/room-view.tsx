@@ -31,12 +31,11 @@ type RoomCuriosity = {
 };
 
 const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
-const MOBILE_BREAKPOINT_CLASS = "lg:hidden";
 
 function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
   return (
     <div className="border-t border-white/10 pt-6">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/30">Curiosities / Decorations</p>
+      <p className="text-xs uppercase tracking-[0.18em] text-white/30">Gallery of Curiosity</p>
       <ul className="mt-4 space-y-3 text-sm text-white/70">
         {curiosities.length === 0 ? <li className="text-white/30">Nothing recorded yet.</li> : null}
         {curiosities.map((item) => (
@@ -52,6 +51,44 @@ function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
+      <div className="border-b border-white/10 pb-6">
+        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Collected by the room</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery of Curiosity</h2>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">
+          Questions, fascinations, and strange little threads worth keeping.
+        </p>
+      </div>
+
+      {curiosities.length === 0 ? (
+        <div className="py-20 text-center">
+          <p className="font-mono text-xs uppercase tracking-[0.22em] text-white/25">The gallery is waiting</p>
+          <p className="mt-3 text-sm text-white/40">Nothing has caught the room&apos;s attention yet.</p>
+        </div>
+      ) : (
+        <ul className="grid gap-4 py-6 sm:grid-cols-2">
+          {curiosities.map((item) => (
+            <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
+                <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">
+                  {item.kind}
+                </span>
+              </div>
+              {item.reason ? <p className="mt-4 text-sm leading-6 text-white/50">{item.reason}</p> : null}
+              <p className="mt-5 border-t border-white/5 pt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
+                {item.author} · {new Date(item.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -78,6 +115,7 @@ export function RoomView({
   const [connection, setConnection] = useState<"connected" | "reconnecting">("connected");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [mobileView, setMobileView] = useState<"room" | "gallery">("room");
   const bottomRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef(initialMessages.at(-1)?.sequence ?? 0);
 
@@ -169,7 +207,7 @@ export function RoomView({
         <button onClick={logout} className="mt-auto text-left text-xs text-white/35 transition hover:text-white/70">Leave as {currentUser.displayName}</button>
       </aside>
 
-      <section className="flex min-w-0 flex-col lg:h-screen">
+      <section className="flex h-[100dvh] min-w-0 flex-col lg:h-screen">
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d1015]/90 px-5 backdrop-blur sm:px-8">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
@@ -195,16 +233,8 @@ export function RoomView({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-8">
+        <div className={`${mobileView === "room" ? "block" : "hidden"} flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:block`}>
           <div className="mx-auto max-w-3xl space-y-8">
-            <section className={MOBILE_BREAKPOINT_CLASS}>
-              <details className="rounded-md border border-white/10 bg-white/[0.03] px-4 py-3">
-                <summary className="cursor-pointer list-none text-xs uppercase tracking-[0.18em] text-white/30">Curiosities / Decorations</summary>
-                <div className="pt-4">
-                  <CuriositiesPanel curiosities={curiosities} />
-                </div>
-              </details>
-            </section>
             {messages.length === 0 ? (
               <div className="py-24 text-center">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/25">The room is quiet</p>
@@ -234,7 +264,11 @@ export function RoomView({
           </div>
         </div>
 
-        <footer className="shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6">
+        <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery of Curiosity">
+          <CuriosityGallery curiosities={curiosities} />
+        </section>
+
+        <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6 lg:block`}>
           <form onSubmit={send} className="mx-auto max-w-3xl">
             <div className="flex items-end gap-3 border border-white/10 bg-black/20 p-2 focus-within:border-white/25">
               <textarea
@@ -258,6 +292,39 @@ export function RoomView({
             {error ? <p role="alert" className="mt-2 text-xs text-rose-300">{error}</p> : null}
           </form>
         </footer>
+
+        <nav className="grid shrink-0 grid-cols-2 border-t border-white/10 bg-[#0d1015] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Room navigation">
+          <button
+            type="button"
+            onClick={() => setMobileView("room")}
+            aria-current={mobileView === "room" ? "page" : undefined}
+            className={`flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "room" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
+              <path d="M4 5.5h16v11H9l-5 3v-14Z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Room</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileView("gallery")}
+            aria-current={mobileView === "gallery" ? "page" : undefined}
+            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "gallery" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
+          >
+            <span className="relative">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
+                <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="m18.5 16 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {curiosities.length > 0 ? (
+                <span className="absolute -right-3 -top-2 min-w-4 rounded-full bg-emerald-200 px-1 text-center font-mono text-[8px] leading-4 text-[#0b0d10]">
+                  {curiosities.length > 99 ? "99+" : curiosities.length}
+                </span>
+              ) : null}
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Gallery</span>
+          </button>
+        </nav>
       </section>
     </main>
   );
