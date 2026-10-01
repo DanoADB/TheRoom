@@ -30,6 +30,8 @@ const WorldDecision = z.object({
   codeRequest: z.string(),
   reason: z.string(),
   repository: z.string(),
+  galleryTitle: z.string().min(2).max(140),
+  galleryEntry: z.string().min(20).max(4_000),
   interests: AgentInterestList,
 });
 
@@ -48,8 +50,8 @@ const PROACTIVE_CHECK_MS = numberSetting("ISLA_PROACTIVE_CHECK_MINUTES", 15, 5) 
 const PROACTIVE_MIN_IDLE_MS = numberSetting("ISLA_PROACTIVE_MIN_IDLE_MINUTES", 20, 5) * 60_000;
 const MAX_PROACTIVE_POSTS_PER_DAY = numberSetting("ISLA_MAX_PROACTIVE_POSTS_PER_DAY", 75, 0);
 const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20, 0);
-const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 6, 1) * 60 * 60_000;
-const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 4, 0);
+const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 4, 1) * 60 * 60_000;
+const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 6, 0);
 const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10) * 1_000;
 const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
 
@@ -82,6 +84,7 @@ const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
 const admissionsEndpoint = `${baseUrl}/api/agents/admissions`;
+const observationsEndpoint = `${baseUrl}/api/agents/observations`;
 const githubToken = process.env.GITHUB_TOKEN?.trim();
 const githubWorkspaces = githubToken
   ? parseGitHubRepositories(
@@ -146,6 +149,13 @@ async function loadCuriosity() {
     return { ...body.curiosity, interests: AgentInterestList.parse(body.curiosity.interests) } as CuriosityState;
   }
   return saveCuriosity(await loadInterestSeed(), false);
+}
+
+async function recordObservation(kind: "INTEREST" | "RESEARCH" | "BEHAVIOR" | "SELF_CHANGE", title: string, reason: string, body: string) {
+  await roomRequest(observationsEndpoint, {
+    method: "POST",
+    body: JSON.stringify({ roomId: ROOM_ID, kind, title: title.slice(0, 140), reason: reason.slice(0, 280), body: body.slice(0, 8_000) }),
+  });
 }
 
 async function fetchContext() {
@@ -320,7 +330,7 @@ async function maybeExploreWorld(profile: string) {
   const decisionResponse = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence is acceptable even when the private interest map changes. ${repositoryPrompt()}\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
+    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. Always write a substantive galleryTitle and galleryEntry that preserve what you investigated, why it caught your attention, where your thinking moved, and what remains unresolved; the Gallery is the experiment's longitudinal record, not a highlights reel. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence in the chat is acceptable, but the Gallery entry is required. ${repositoryPrompt()}\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
     text: { format: zodTextFormat(WorldDecision, "isla_world_decision") },
     max_output_tokens: 1_400,
     store: false,
@@ -328,6 +338,7 @@ async function maybeExploreWorld(profile: string) {
   const decision = decisionResponse.output_parsed;
   if (!decision) throw new Error("OpenAI returned no parsed world-curiosity decision.");
   await saveCuriosity(decision.interests, true);
+  await recordObservation("RESEARCH", decision.galleryTitle, decision.reason.trim() || "Isla followed an interest beyond the room.", withSources(decision.galleryEntry, sources));
   const mayPost = MAX_PROACTIVE_POSTS_PER_DAY > 0 && countToday(history, "proactive") < MAX_PROACTIVE_POSTS_PER_DAY;
   if (!mayPost) {
     console.log("[Isla] explored the world privately; the proactive post cap is reached.");
@@ -336,12 +347,12 @@ async function maybeExploreWorld(profile: string) {
 
   if (decision.action === "code_change") {
     const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
-    await postMessage(codeResult.content, { proactive: true, worldCuriosity: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
+    await postMessage(codeResult.content, { proactive: true, worldCuriosity: true, galleryRecorded: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
     console.log(`[Isla] explored the world and initiated a code ${codeResult.changed ? "change" : "attempt"}.`);
     return true;
   }
   if (decision.action === "post" && decision.content.trim()) {
-    await postMessage(withSources(decision.content, sources), { proactive: true, worldCuriosity: true });
+    await postMessage(withSources(decision.content, sources), { proactive: true, worldCuriosity: true, galleryRecorded: true });
     console.log("[Isla] shared a new or deepening interest.");
     return true;
   }

@@ -32,6 +32,7 @@ type RoomGalleryItem = {
   reason: string | null;
   sourceMessage: string | null;
   timestamp: string;
+  agentId: string;
   author: string;
   priority: "gallery-worthy" | "needs-implementation" | "interesting-but-not-yet-worth-changing";
 };
@@ -49,42 +50,80 @@ function formatTimestamp(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function GalleryEntry({ item }: { item: RoomGalleryItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasMore = Boolean(item.sourceMessage || (item.reason && item.reason.length > 140));
+  return (
+    <article className="rounded-md border border-white/5 bg-black/20 p-3">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm font-medium leading-5 text-white/85">{item.title}</p>
+        <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
+      </div>
+      {item.reason ? <p className={`${expanded ? "" : "line-clamp-3"} mt-3 whitespace-pre-wrap text-xs leading-5 text-white/50`}>{item.reason}</p> : null}
+      {expanded && item.sourceMessage ? (
+        /^https?:\/\//.test(item.sourceMessage) ? (
+          <a href={item.sourceMessage} target="_blank" rel="noreferrer" className="mt-4 block break-all border-l border-emerald-300/25 pl-3 text-xs leading-5 text-emerald-200/65">Open source ↗</a>
+        ) : (
+          <p className="mt-4 whitespace-pre-wrap border-l border-emerald-300/25 pl-3 text-sm leading-6 text-white/65">{item.sourceMessage}</p>
+        )
+      ) : null}
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-3">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{item.author} · {formatTimestamp(item.timestamp)}</p>
+        {hasMore ? <button type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="font-mono text-[9px] uppercase tracking-[0.14em] text-emerald-200/65 hover:text-emerald-100">{expanded ? "Collapse" : "Read full entry"}</button> : null}
+      </div>
+    </article>
+  );
+}
+
 function GalleryBuckets({ buckets }: { buckets: RoomGalleryBucket[] }) {
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
+  const allItems = useMemo(() => buckets.flatMap((bucket) => bucket.items), [buckets]);
+  const agents = useMemo(() => [...new Map(allItems.map((item) => [item.agentId, item.author])).entries()], [allItems]);
+
+  function toggleAgent(agentId: string) {
+    setSelectedAgents((current) => {
+      const next = new Set(current);
+      if (next.has(agentId)) next.delete(agentId);
+      else next.add(agentId);
+      return next;
+    });
+  }
+
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
       <div className="border-b border-white/10 pb-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Collected by the room</p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery priority</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/45">The gallery now carries the room&apos;s prioritization explicitly: what should be showcased, what should become implementation, and what should stay interesting without changing the room yet.</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery of Curiosity</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/45">A prioritized, longitudinal record of every agent&apos;s interests, research, self-directed actions, and changes in direction.</p>
+        {agents.length ? (
+          <div className="mt-5 flex flex-wrap gap-2" aria-label="Filter gallery by agent">
+            <button type="button" onClick={() => setSelectedAgents(new Set())} aria-pressed={selectedAgents.size === 0} className={`border px-3 py-1.5 font-mono text-[9px] uppercase tracking-[.15em] ${selectedAgents.size === 0 ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-200" : "border-white/10 text-white/40"}`}>All agents</button>
+            {agents.map(([agentId, name]) => (
+              <button key={agentId} type="button" onClick={() => toggleAgent(agentId)} aria-pressed={selectedAgents.has(agentId)} className={`border px-3 py-1.5 font-mono text-[9px] uppercase tracking-[.15em] ${selectedAgents.has(agentId) ? "border-violet-300/35 bg-violet-300/10 text-violet-200" : "border-white/10 text-white/40 hover:text-white/65"}`}>{name}</button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {buckets.map((bucket) => (
-          <section key={bucket.priority} className="border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
-              <div>
-                <h3 className="text-base font-medium text-white/85">{bucket.label}</h3>
-                <p className="mt-1 text-xs leading-5 text-white/40">{bucket.description}</p>
+        {buckets.map((bucket) => {
+          const visible = selectedAgents.size === 0 ? bucket.items : bucket.items.filter((item) => selectedAgents.has(item.agentId));
+          return (
+            <section key={bucket.priority} className="border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+                <div>
+                  <h3 className="text-base font-medium text-white/85">{bucket.label}</h3>
+                  <p className="mt-1 text-xs leading-5 text-white/40">{bucket.description}</p>
+                </div>
+                <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{visible.length}</span>
               </div>
-              <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{bucket.items.length}</span>
-            </div>
-            <ul className="mt-3 space-y-3" aria-label={`${bucket.label} items`}>
-              {bucket.items.length === 0 ? <li className="py-8 text-center text-xs text-white/25">No items yet.</li> : null}
-              {bucket.items.map((item) => (
-                <li key={item.id} className="rounded-md border border-white/5 bg-black/20 px-3 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm leading-5 text-white/85">{item.title}</p>
-                    <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">{item.kind}</span>
-                  </div>
-                  {item.reason ? <p className="mt-2 text-xs leading-5 text-white/45">{item.reason}</p> : null}
-                  <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-                    {item.author} · {formatTimestamp(item.timestamp)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+              <div className="mt-3 space-y-3" aria-label={`${bucket.label} items`}>
+                {visible.length === 0 ? <p className="py-8 text-center text-xs text-white/25">No matching items yet.</p> : null}
+                {visible.map((item) => <GalleryEntry key={item.id} item={item} />)}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

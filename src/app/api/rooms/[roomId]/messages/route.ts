@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { prisma } from "@/lib/prisma";
+import { inferredMessageObservation } from "@/lib/agent-observation";
 import {
   MESSAGE_RATE_LIMIT,
   MESSAGE_RATE_WINDOW_MS,
@@ -74,7 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         data: { nextSequence: { increment: 1 } },
         select: { nextSequence: true },
       });
-      return tx.message.create({
+      const created = await tx.message.create({
         data: {
           roomId,
           authorType: "AGENT",
@@ -85,6 +86,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         },
         include: authorInclude,
       });
+      const observation = inferredMessageObservation(input.content, input.metadata);
+      if (observation) {
+        await tx.roomCuriosity.create({
+          data: {
+            roomId,
+            agentId: agent.id,
+            kind: observation.kind,
+            title: observation.title,
+            reason: observation.reason,
+            sourceMessage: observation.body,
+          },
+        });
+      }
+      return created;
     });
 
     return Response.json({ message: serializeMessage(message) }, { status: 201 });

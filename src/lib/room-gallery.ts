@@ -17,6 +17,7 @@ export type RoomGalleryViewItem = {
   reason: string | null;
   sourceMessage: string | null;
   timestamp: string;
+  agentId: string;
   author: string;
   priority: RoomGalleryPriority;
 };
@@ -29,7 +30,7 @@ type RoomCuriosityRecord = {
   sourceMessage: string | null;
   priority: "GALLERY_WORTHY" | "NEEDS_IMPLEMENTATION" | "INTERESTING_BUT_NOT_YET_WORTH_CHANGING";
   createdAt: Date;
-  agent: { displayName: string };
+  agent: { id: string; displayName: string };
 };
 
 type AgentGalleryRecord = {
@@ -40,6 +41,7 @@ type AgentGalleryRecord = {
   imageUrl: string | null;
   priority: "GALLERY_WORTHY" | "NEEDS_IMPLEMENTATION" | "INTERESTING_BUT_NOT_YET_WORTH_CHANGING";
   createdAt: Date;
+  agentId: string;
   author: string;
 };
 
@@ -72,9 +74,22 @@ function toPriority(value: RoomCuriosityRecord["priority"] | AgentGalleryRecord[
   }
 }
 
+type CurrentInterestRecord = {
+  agentId: string;
+  author: string;
+  updatedAt: Date;
+  interests: Array<{
+    topic: string;
+    why: string;
+    nextQuestion: string;
+    origin: string;
+    strength: number;
+  }>;
+};
 export function buildRoomGallery(
   roomCuriosities: RoomCuriosityRecord[],
   agentGalleryItems: AgentGalleryRecord[],
+  currentInterests: CurrentInterestRecord[] = [],
 ) {
   const items = [
     ...roomCuriosities.map((item) => ({
@@ -84,6 +99,7 @@ export function buildRoomGallery(
       reason: item.reason,
       sourceMessage: item.sourceMessage,
       timestamp: item.createdAt.toISOString(),
+      agentId: item.agent.id,
       author: item.agent.displayName,
       priority: toPriority(item.priority),
     })),
@@ -94,9 +110,21 @@ export function buildRoomGallery(
       reason: item.provenance,
       sourceMessage: item.imageUrl,
       timestamp: item.createdAt.toISOString(),
+      agentId: item.agentId,
       author: item.author,
       priority: toPriority(item.priority),
     })),
+    ...currentInterests.flatMap((record) => record.interests.map((interest) => ({
+      id: `current-interest:${record.agentId}:${interest.topic}`,
+      kind: "CURRENT INTEREST",
+      title: interest.topic,
+      reason: interest.why,
+      sourceMessage: `Open question: ${interest.nextQuestion}\n\nOrigin: ${interest.origin} · Strength: ${interest.strength}/5`,
+      timestamp: record.updatedAt.toISOString(),
+      agentId: record.agentId,
+      author: record.author,
+      priority: "gallery-worthy" as const,
+    }))),
   ].sort((left, right) => {
     const priorityDelta = priorityOrder.indexOf(left.priority) - priorityOrder.indexOf(right.priority);
     if (priorityDelta !== 0) return priorityDelta;

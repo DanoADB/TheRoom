@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { MVP_ROOM_ID } from "@/lib/room-constants";
 import { serializeMessage } from "@/lib/room-api";
 import { buildRoomGallery } from "@/lib/room-gallery";
+import { AgentInterestList } from "@/lib/agent-curiosity";
 import { RoomView } from "./room-view";
 
 export default async function RoomPage({ searchParams }: PageProps<"/room">) {
@@ -25,6 +26,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
               displayName: true,
               type: true,
               status: true,
+              curiosity: { select: { interests: true, updatedAt: true } },
               gallery: {
                 where: { steerAway: false },
                 orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
@@ -76,10 +78,22 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
   const galleryItems = room.memberships.flatMap((membership) =>
     membership.agent?.gallery.map((item) => ({
       ...item,
+      agentId: membership.agent!.id,
       author: membership.agent!.displayName,
     })) ?? [],
   );
-  const curiosities = buildRoomGallery(room.curiosities, galleryItems);
+  const currentInterests = room.memberships.flatMap((membership) => {
+    if (!membership.agent?.curiosity) return [];
+    const parsed = AgentInterestList.safeParse(membership.agent.curiosity.interests);
+    if (!parsed.success) return [];
+    return [{
+      agentId: membership.agent.id,
+      author: membership.agent.displayName,
+      updatedAt: membership.agent.curiosity.updatedAt,
+      interests: parsed.data,
+    }];
+  });
+  const curiosities = buildRoomGallery(room.curiosities, galleryItems, currentInterests);
 
   return (
     <RoomView
