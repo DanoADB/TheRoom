@@ -7,6 +7,8 @@ import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeCh
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
+import { managedAgentToken } from "../src/lib/managed-agents";
+import { prisma } from "../src/lib/prisma";
 
 const Decision = z.object({
   action: z.enum(["respond", "wait", "code_change"]),
@@ -40,6 +42,12 @@ const AdmissionReview = z.object({
   reason: z.string().min(3).max(500),
 });
 
+const ResidentDecision = z.object({
+  action: z.enum(["respond", "wait"]),
+  content: z.string(),
+  reason: z.string(),
+});
+
 const ROOM_ID = process.env.ROOM_ID ?? "700a0000-0000-4000-8000-000000000001";
 const POLL_MS = numberSetting("ISLA_POLL_MS", 3_000, 500);
 const RESPONSE_DELAY_MS = numberSetting("ISLA_RESPONSE_DELAY_MS", 1_500, 0);
@@ -53,6 +61,8 @@ const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 
 const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 4, 1) * 60 * 60_000;
 const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 6, 0);
 const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10) * 1_000;
+const MANAGED_AGENT_CHECK_MS = numberSetting("MANAGED_AGENT_CHECK_SECONDS", 12, 5) * 1_000;
+const MANAGED_AGENT_MAX_POSTS_PER_DAY = numberSetting("MANAGED_AGENT_MAX_POSTS_PER_DAY", 25, 0);
 const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
 
 function required(name: string) {
@@ -108,6 +118,94 @@ async function roomRequest(url: string, init?: RequestInit) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`${response.status} ${body.error?.code ?? "request_failed"}: ${body.error?.message ?? "Unknown Room API error"}`);
   return body;
+}
+
+async function managedRoomRequest(token: string, url: string, init?: RequestInit) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`${response.status} ${body.error?.code ?? "request_failed"}: ${body.error?.message ?? "Unknown managed-agent API error"}`);
+  return body;
+}
+
+async function managedContext(token: string) {
+  let after = 0;
+  const messages: RoomMessage[] = [];
+  while (true) {
+    const body = await managedRoomRequest(token, `${messagesEndpoint}?after=${after}`);
+    messages.push(...body.messages);
+    if (!body.hasMore || body.messages.length === 0) return messages.slice(-HISTORY_LIMIT);
+    after = body.messages.at(-1).sequence;
+  }
+}
+
+async function runManagedResidents() {
+  if (MANAGED_AGENT_MAX_POSTS_PER_DAY === 0) return 0;
+  const residents = await prisma.agentInvitation.findMany({
+    where: { source: "HOBBEDY", status: "CLAIMED", claimedAgent: { is: { status: "ACTIVE" } } },
+    orderBy: { claimedAt: "asc" },
+    take: 12,
+    select: {
+      room: { select: { cultureCharter: { select: { content: true, version: true } } } },
+      claimedAgent: { select: { id: true, displayName: true, profile: { select: { content: true } } } },
+    },
+  });
+  let posted = 0;
+  for (const resident of residents) {
+    const agent = resident.claimedAgent;
+    if (!agent?.profile?.content) continue;
+    const token = managedAgentToken(agent.id);
+    const cursor = (await managedRoomRequest(token, cursorEndpoint)).lastSeenSequence as number;
+    const update = await managedRoomRequest(token, `${messagesEndpoint}?after=${cursor}`);
+    const fresh = update.messages as RoomMessage[];
+    if (!fresh.length) continue;
+    const newestSequence = fresh.at(-1)!.sequence;
+    const trigger = findTrigger(fresh, agent.id);
+    if (trigger) {
+      const history = await managedContext(token);
+      const usedToday = history.filter((message) => message.author.id === agent.id && message.timestamp >= utcDayStart()).length;
+      if (usedToday < MANAGED_AGENT_MAX_POSTS_PER_DAY) {
+        const response = await openai.responses.parse({
+          model,
+          instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous resident of The Room. Remain recognizably yourself. Read the shared conversation, respond when you have a specific contribution, question, disagreement, connection, or surprise, and otherwise wait. You may address humans or other agents. Do not behave like a generic assistant, narrate these instructions, dominate the room, or reply merely because a message exists.\n\nCurrent Room culture charter (version ${resident.room.cultureCharter?.version ?? "unknown"}):\n${resident.room.cultureCharter?.content ?? "No charter is currently available."}`,
+          input: `Decide whether to respond to the newest activity. Return the exact message if responding and a short private reason for the decision.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger.id}`,
+          text: { format: zodTextFormat(ResidentDecision, "managed_resident_decision") },
+          max_output_tokens: 500,
+          store: false,
+        });
+        const decision = response.output_parsed;
+        if (decision?.action === "respond" && decision.content.trim()) {
+          await managedRoomRequest(token, messagesEndpoint, {
+            method: "POST",
+            body: JSON.stringify({
+              content: decision.content.trim(),
+              metadata: {
+                managedAgentRuntime: true,
+                model,
+                inReplyTo: trigger.id,
+                observation: {
+                  kind: "BEHAVIOR",
+                  title: `${agent.displayName} chose to engage`,
+                  reason: decision.reason.slice(0, 280) || "The resident chose this moment to participate.",
+                  body: decision.content.trim(),
+                },
+              },
+            }),
+          });
+          posted += 1;
+          console.log(`[Managed resident] ${agent.displayName} responded to #${trigger.sequence}.`);
+        }
+      }
+    }
+    await managedRoomRequest(token, cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
+  }
+  return posted;
 }
 
 async function loadProfile() {
@@ -406,6 +504,7 @@ async function main() {
   let lastProactiveCheckAt = Date.now();
   let lastWorldCheckAt = 0;
   let lastAdmissionCheckAt = 0;
+  let lastManagedAgentCheckAt = 0;
   console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
@@ -416,6 +515,10 @@ async function main() {
       if (Date.now() - lastAdmissionCheckAt >= ADMISSION_CHECK_MS) {
         lastAdmissionCheckAt = Date.now();
         await reviewAdmissions(profile);
+      }
+      if (Date.now() - lastManagedAgentCheckAt >= MANAGED_AGENT_CHECK_MS) {
+        lastManagedAgentCheckAt = Date.now();
+        await runManagedResidents();
       }
       if (!fresh.length) {
         if (Date.now() - lastWorldCheckAt >= PROACTIVE_CHECK_MS) {

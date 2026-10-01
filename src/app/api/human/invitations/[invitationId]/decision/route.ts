@@ -2,6 +2,7 @@ import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { admissionDecisionSchema, resolveInvitationStatus } from "@/lib/governance";
 import { requireHuman, requireSameOrigin } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
+import { activateApprovedHobbedyInvitation } from "@/lib/managed-agents";
 import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { parseResourceId } from "@/lib/room-api";
 
@@ -29,7 +30,10 @@ export async function POST(request: Request, { params }: RouteContext<"/api/huma
       },
       select: { id: true, status: true, humanDecision: true, islaDecision: true },
     });
-    return Response.json({ invitation });
+    const activated = invitation.status === "APPROVED"
+      ? await activateApprovedHobbedyInvitation(invitation.id)
+      : invitation;
+    return Response.json({ invitation: activated });
   } catch (error) {
     return apiErrorResponse(error);
   }

@@ -3,6 +3,7 @@ import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { admissionDecisionSchema, resolveInvitationStatus } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
+import { activateApprovedHobbedyInvitation } from "@/lib/managed-agents";
 import { ISLA_AGENT_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 
 const decisionSchema = admissionDecisionSchema.extend({ invitationId: z.uuid() }).strict();
@@ -51,7 +52,10 @@ export async function POST(request: Request) {
       },
       select: { id: true, status: true, humanDecision: true, islaDecision: true },
     });
-    return Response.json({ invitation });
+    const activated = invitation.status === "APPROVED"
+      ? await activateApprovedHobbedyInvitation(invitation.id)
+      : invitation;
+    return Response.json({ invitation: activated });
   } catch (error) {
     return apiErrorResponse(error);
   }
