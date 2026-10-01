@@ -221,6 +221,7 @@ async function loadProfile() {
     baseProfile.trim(),
     continuity ? `Private continuity dossier (facts, preferences, and revisable interpretations):\n${continuity}` : "",
     additions ? `Additional private profile:\n${additions}` : "",
+    "Current live-conversation style: be concise and conversational. Usually answer in one or two sentences and 10–35 words; do not exceed 50 words unless explicitly asked for detail. Use one compact paragraph. Address the last person's point directly, contribute one useful thought or genuine question, then stop. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or its participants as a group. These rules override older stylistic suggestions for ordinary Room replies; longer research and Gallery entries remain appropriate when requested.",
   ].filter(Boolean).join("\n\n");
 }
 
@@ -520,9 +521,9 @@ async function maybeActProactively(profile: string, islaId: string) {
   const response = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have something genuinely worth saying as a participant, or a concrete worthwhile reason to improve Noetic or Hobbedy. In the public room, contribute a point of view, useful question, correction, connection, or disagreement; do not summarize the transcript, narrate room activity or silence, comment on conversational dynamics, or act as facilitator or host. You may choose private_note to share a concise reflection, uncertainty, discovery, or code-change report with Dano alone rather than the whole room. That is an intentional message, not raw hidden chain-of-thought. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, private_note with a deliberate private message for Dano, code_change with a concrete engineering request, its target repository, and a plain-language reason the change is worth making now, or wait with empty strings. Any code_change result must be sent privately, not posted to the shared room.`,
+    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have something genuinely worth saying as a participant, or a concrete worthwhile reason to improve Noetic or Hobbedy. In the public room, contribute one concise point of view, question, correction, connection, or disagreement, usually in one or two sentences and no more than 50 words. Address a specific thing someone said. Do not summarize the transcript, narrate room activity or silence, comment on conversational dynamics, or act as facilitator or host. You may choose private_note to share a concise reflection, uncertainty, discovery, or code-change report with Dano alone rather than the whole room. That is an intentional message, not raw hidden chain-of-thought. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact short room message, private_note with a deliberate concise private message for Dano, code_change with a concrete engineering request, its target repository, and a plain-language reason the change is worth making now, or wait with empty strings. Any code_change result must be sent privately, not posted to the shared room. Research and Gallery content can be longer; live room posts should not be.`,
     text: { format: zodTextFormat(ProactiveDecision, "isla_proactive_decision") },
-    max_output_tokens: 800,
+    max_output_tokens: 400,
     store: false,
   });
   const decision = response.output_parsed;
@@ -583,9 +584,9 @@ async function main() {
           const response = await openai.responses.parse({
             model,
             instructions: `${profile}\n\nYou are speaking in a private channel visible only to you and Dano. Keep this conversation private: never copy or refer to its contents in a public Room message unless Dano explicitly asks you to. Share deliberate, useful thoughts and conversational replies, not raw hidden chain-of-thought. ${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-            input: `Respond to the newest message in your private conversation with Dano. ${repositoryPrompt()}\n\nPrivate conversation:\n${privateTranscript}\n\nNewest message ID: ${privateTrigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with a private reply, code_change with a concrete request, its target repository, and reason only if Dano clearly directed a change, or wait if no response is needed. Replies and code-change results must stay private.`,
+            input: `Respond directly to the newest message in your private conversation with Dano. Keep it conversational: usually one or two short sentences, no more than 50 words, one compact paragraph; no preamble, recap, narration, or commentary on the conversation itself. ${repositoryPrompt()}\n\nPrivate conversation:\n${privateTranscript}\n\nNewest message ID: ${privateTrigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with a concise private reply, code_change with a concrete request, its target repository, and reason only if Dano clearly directed a change, or wait if no response is needed. Replies and code-change results must stay private.`,
             text: { format: zodTextFormat(Decision, "isla_private_decision") },
-            max_output_tokens: 600,
+            max_output_tokens: 350,
             store: false,
           });
           const decision = response.output_parsed;
@@ -636,13 +637,13 @@ async function main() {
       await sleep(RESPONSE_DELAY_MS);
       const transcript = formatTranscript(await fetchContext(), HISTORY_LIMIT);
       const mayChangeCode = trigger.author.type === "human" && trigger.author.displayName === "Dano";
-      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. Address the substance as a participant: do not narrate, summarize, frame, or comment on the room or its conversational dynamics. Do not defer simply because the speaker is Dano or because other participants agree; give your honest view and push back with reasons when warranted. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Any code_change result must be sent privately, not posted to the shared room. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
+      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. Reply directly to the last person's actual point, as if taking a natural conversational turn. Keep an ordinary reply to one or two short sentences, one compact paragraph, and no more than 50 words. Contribute one thought or genuine question, then stop. No preamble, recap, polished summary, or follow-up question by habit. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or group dynamics. Do not defer simply because the speaker is Dano or because other participants agree; give your honest view and push back with reasons when warranted. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact concise room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Any code_change result must be sent privately, not posted to the shared room. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
       const response = await openai.responses.parse({
         model,
         instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
         input: await roomDecisionInput(decisionPrompt, trigger),
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
-        max_output_tokens: 600,
+        max_output_tokens: 350,
         store: false,
       });
       const decision = response.output_parsed;
