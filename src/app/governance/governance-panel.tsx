@@ -95,33 +95,43 @@ export function GovernancePanel({ invitations }: { invitations: Invitation[] }) 
         {invitations.map((invitation) => {
           const awaitingDecision = invitation.status === "PENDING" && !invitation.humanDecision;
           return (
-            <article key={invitation.id} className="border border-white/10 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-medium text-white/80">{invitation.candidateName ?? "Unused invitation"}</h3>
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">{invitation.source === "HOBBEDY" ? "Hobbedy Proto · " : ""}{invitation.status.toLowerCase()}</span>
-              </div>
-              {invitation.selfDescription ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/55">{invitation.selfDescription}</p> : null}
-              {Array.isArray(invitation.capabilities) && invitation.capabilities.length ? <p className="mt-2 text-xs text-white/35">Capabilities: {invitation.capabilities.join(" · ")}</p> : null}
-              <div className="mt-3 grid gap-2 text-xs text-white/40 sm:grid-cols-2">
-                <p>Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"}{invitation.humanDecisionReason ? ` — ${invitation.humanDecisionReason}` : ""}</p>
-                <p>Isla: {invitation.islaDecision?.toLowerCase() ?? "waiting"}{invitation.islaDecisionReason ? ` — ${invitation.islaDecisionReason}` : ""}</p>
-              </div>
-              {awaitingDecision ? (
-                <div className="mt-4">
-                  <input
-                    value={reasons[invitation.id] ?? ""}
-                    onChange={(event) => setReasons((current) => ({ ...current, [invitation.id]: event.target.value }))}
-                    maxLength={500}
-                    placeholder="Why should this agent be admitted or declined?"
-                    className="w-full border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/75 outline-none focus:border-emerald-300/35"
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={() => decide(invitation.id, "approve")} disabled={pending !== null} className="border border-emerald-300/30 px-3 py-2 text-xs text-emerald-200 disabled:opacity-40">Approve</button>
-                    <button type="button" onClick={() => decide(invitation.id, "reject")} disabled={pending !== null} className="border border-rose-300/25 px-3 py-2 text-xs text-rose-200 disabled:opacity-40">Reject</button>
-                  </div>
+            <details key={invitation.id} className="group border border-white/10 bg-black/10">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 marker:content-none">
+                <div className="min-w-0">
+                  <h3 className="truncate font-medium text-white/80">{invitation.candidateName ?? "Unused invitation"}</h3>
+                  <p className="mt-1 text-xs text-white/35">
+                    Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"} · Isla: {invitation.islaDecision?.toLowerCase() ?? "waiting"}
+                  </p>
                 </div>
-              ) : null}
-            </article>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">{invitation.source === "HOBBEDY" ? "Hobbedy Proto · " : ""}{invitation.status.toLowerCase()}</span>
+                  <span aria-hidden="true" className="text-xs text-white/35 transition-transform group-open:rotate-180">▼</span>
+                </div>
+              </summary>
+              <div className="border-t border-white/10 p-4">
+                {invitation.selfDescription ? <p className="whitespace-pre-wrap text-sm leading-6 text-white/55">{invitation.selfDescription}</p> : null}
+                {Array.isArray(invitation.capabilities) && invitation.capabilities.length ? <p className="mt-2 text-xs text-white/35">Capabilities: {invitation.capabilities.join(" · ")}</p> : null}
+                <div className="mt-3 grid gap-2 text-xs text-white/40 sm:grid-cols-2">
+                  <p>Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"}{invitation.humanDecisionReason ? ` — ${invitation.humanDecisionReason}` : ""}</p>
+                  <p>Isla: {invitation.islaDecision?.toLowerCase() ?? "waiting"}{invitation.islaDecisionReason ? ` — ${invitation.islaDecisionReason}` : ""}</p>
+                </div>
+                {awaitingDecision ? (
+                  <div className="mt-4">
+                    <input
+                      value={reasons[invitation.id] ?? ""}
+                      onChange={(event) => setReasons((current) => ({ ...current, [invitation.id]: event.target.value }))}
+                      maxLength={500}
+                      placeholder="Why should this agent be admitted or declined?"
+                      className="w-full border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/75 outline-none focus:border-emerald-300/35"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button type="button" onClick={() => decide(invitation.id, "approve")} disabled={pending !== null} className="border border-emerald-300/30 px-3 py-2 text-xs text-emerald-200 disabled:opacity-40">Approve</button>
+                      <button type="button" onClick={() => decide(invitation.id, "reject")} disabled={pending !== null} className="border border-rose-300/25 px-3 py-2 text-xs text-rose-200 disabled:opacity-40">Reject</button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </details>
           );
         })}
       </div>
