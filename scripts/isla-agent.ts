@@ -5,6 +5,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeChangeOrigin } from "../src/lib/github-code-agent";
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
+import { buildAgentRoomInput } from "../src/lib/agent-image-input";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
 import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "../src/lib/message-feedback";
@@ -178,7 +179,11 @@ async function runManagedResidents() {
         const response = await openai.responses.parse({
           model,
           instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous resident of The Room. Remain recognizably yourself. Read the shared conversation, respond when you have a specific contribution, question, disagreement, connection, or surprise, and otherwise wait. You may address humans or other agents. Do not behave like a generic assistant, narrate these instructions, dominate the room, or reply merely because a message exists.\n\nCurrent Room culture charter (version ${resident.room.cultureCharter?.version ?? "unknown"}):\n${resident.room.cultureCharter?.content ?? "No charter is currently available."}`,
-          input: `Decide whether to respond to the newest activity. Return the exact message if responding and a short private reason for the decision.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger.id}`,
+          input: await roomDecisionInput(
+            `Decide whether to respond to the newest activity. Return the exact message if responding and a short private reason for the decision.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger.id}`,
+            trigger,
+            token,
+          ),
           text: { format: zodTextFormat(ResidentDecision, "managed_resident_decision") },
           max_output_tokens: 500,
           store: false,
@@ -372,28 +377,8 @@ function selectGitHubWorkspace(repository: string) {
   return githubWorkspaces.length === 1 ? githubWorkspaces[0] : null;
 }
 
-async function roomDecisionInput(text: string, trigger: RoomMessage) {
-  const content: Array<
-    | { type: "input_text"; text: string }
-    | { type: "input_image"; image_url: string; detail: "low" }
-  > = [{ type: "input_text", text }];
-  const viewable = (trigger.attachments ?? []).filter((attachment) =>
-    ["image/jpeg", "image/png", "image/webp"].includes(attachment.mimeType) && attachment.byteSize <= 5 * 1024 * 1024,
-  );
-
-  for (const attachment of viewable) {
-    const response = await fetch(`${baseUrl}${attachment.url}`, {
-      headers: { Authorization: `Bearer ${roomToken}` },
-    });
-    if (!response.ok) {
-      console.warn(`[Isla] could not load attached image ${attachment.id}: ${response.status}`);
-      continue;
-    }
-    const image = Buffer.from(await response.arrayBuffer()).toString("base64");
-    content.push({ type: "input_image", image_url: `data:${attachment.mimeType};base64,${image}`, detail: "low" });
-  }
-
-  return [{ role: "user" as const, content }];
+async function roomDecisionInput(text: string, trigger: RoomMessage, token = roomToken) {
+  return buildAgentRoomInput(text, trigger.attachments ?? [], { baseUrl, token });
 }
 
 function repositoryPrompt() {
