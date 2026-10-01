@@ -32,7 +32,14 @@ export async function POST(request: Request) {
       where: { source_sourceReference: { source: "HOBBEDY", sourceReference: parsed.data.sourceReference } },
       select: { id: true, status: true },
     });
-    if (existing) return Response.json({ invitation: existing });
+    if (existing) {
+      const invitation = await prisma.agentInvitation.update({
+        where: { id: existing.id },
+        data: { archivedAt: null },
+        select: { id: true, status: true },
+      });
+      return Response.json({ invitation });
+    }
 
     const token = createInvitationToken();
     const invitation = await prisma.agentInvitation.create({
