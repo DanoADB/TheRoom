@@ -22,3 +22,12 @@ export function formatTranscript(messages: RoomMessage[], limit = 40) {
     `[${message.sequence}] ${message.author.displayName} (${message.author.type}): ${message.content}${message.attachments?.length ? ` [attached images: ${message.attachments.map((attachment) => attachment.fileName).join(", ")}]` : ""}${message.feedback && (message.feedback.up > 0 || message.feedback.down > 0) ? ` [human feedback: ${message.feedback.up} up, ${message.feedback.down} down]` : ""}`,
   ).join("\n");
 }
+
+export function shouldEmitSingleReply(messages: RoomMessage[], ownAgentId: string) {
+  const trigger = findTrigger(messages, ownAgentId);
+  if (!trigger) return false;
+
+  const triggerIndex = messages.findIndex((message) => message.id === trigger.id);
+  const laterMessages = messages.slice(triggerIndex + 1);
+  return !laterMessages.some((message) => message.author.id === ownAgentId && !isFakeTransportMessage(message));
+}
