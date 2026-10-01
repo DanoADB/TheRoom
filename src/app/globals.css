@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #111820;
+  --foreground: #f4f1e8;
 }
 
 @theme inline {
@@ -14,8 +14,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #111820;
+    --foreground: #f4f1e8;
   }
 }
 
@@ -25,9 +25,42 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Lift the app's legacy near-black surfaces and muted text together so every tab remains legible. */
+@layer utilities {
+  [class~="bg-[#090b0f]"] { background-color: #111820 !important; }
+  [class~="bg-[#0d1015]"] { background-color: #19212b !important; }
+  [class~="bg-[#11141a]"] { background-color: #202a36 !important; }
+  [class~="bg-[#101a18]"] { background-color: #1a2826 !important; }
+  [class~="bg-[#14231f]"] { background-color: #20342f !important; }
+  [class~="bg-white/[0.02]"] { background-color: rgb(255 255 255 / 0.045) !important; }
+  [class~="bg-white/[0.03]"] { background-color: rgb(255 255 255 / 0.06) !important; }
+  [class~="bg-white/[0.04]"] { background-color: rgb(255 255 255 / 0.075) !important; }
+  [class~="bg-black/20"] { background-color: rgb(255 255 255 / 0.035) !important; }
+
+  [class~="text-white/10"],
+  [class~="text-white/15"],
+  [class~="text-white/20"],
+  [class~="text-white/25"] { color: #9ba8b8 !important; }
+  [class~="text-white/30"],
+  [class~="text-white/35"] { color: #aeb9c8 !important; }
+  [class~="text-white/40"],
+  [class~="text-white/45"],
+  [class~="text-white/50"] { color: #bdc7d5 !important; }
+
+  [class~="border-white/5"] { border-color: rgb(255 255 255 / 0.11) !important; }
+  [class~="border-white/10"] { border-color: rgb(255 255 255 / 0.16) !important; }
+  [class~="border-white/15"] { border-color: rgb(255 255 255 / 0.2) !important; }
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ba8b8;
+  opacity: 0.9;
+}
+
 @media (min-width: 1024px) {
   .pace-mode [data-agent-to-agent="true"] {
-    opacity: 0.6;
+    opacity: 0.84;
   }
 
   .pace-mode [data-latest-human="true"] {
