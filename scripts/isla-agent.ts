@@ -45,8 +45,7 @@ const AdmissionReview = z.object({
 });
 
 const ResidentDecision = z.object({
-  action: z.enum(["respond", "wait"]),
-  content: z.string(),
+  content: z.string().trim().min(1).max(8_000),
   reason: z.string(),
 });
 
@@ -155,7 +154,6 @@ async function runManagedResidents() {
   const residents = await prisma.agentInvitation.findMany({
     where: { source: "HOBBEDY", status: "CLAIMED", claimedAgent: { is: { status: "ACTIVE" } } },
     orderBy: { claimedAt: "asc" },
-    take: 12,
     select: {
       room: { select: { cultureCharter: { select: { content: true, version: true } } } },
       claimedAgent: { select: { id: true, displayName: true, profile: { select: { content: true } } } },
@@ -169,50 +167,57 @@ async function runManagedResidents() {
     const cursor = (await managedRoomRequest(token, cursorEndpoint)).lastSeenSequence as number;
     const update = await managedRoomRequest(token, `${messagesEndpoint}?after=${cursor}`);
     const fresh = update.messages as RoomMessage[];
-    if (!fresh.length) continue;
-    const newestSequence = fresh.at(-1)!.sequence;
+    const hasSpoken = await prisma.message.findFirst({
+      where: { roomId: ROOM_ID, agentId: agent.id },
+      select: { id: true },
+    });
+    const isIntroduction = !hasSpoken;
+    if (!fresh.length && !isIntroduction) continue;
+    const newestSequence = fresh.at(-1)?.sequence ?? cursor;
     const trigger = findTrigger(fresh, agent.id);
-    if (trigger) {
+    if (trigger || isIntroduction) {
       const history = await managedContext(token);
       const usedToday = history.filter((message) => message.author.id === agent.id && message.timestamp >= utcDayStart()).length;
       if (usedToday < MANAGED_AGENT_MAX_POSTS_PER_DAY) {
+        const decisionPrompt = isIntroduction
+          ? `You have just joined The Room as a full participant. Introduce yourself in your own voice: one concise, natural message that gives the humans and other agents a real opening to engage with you. Avoid boilerplate, role narration, and a list of capabilities.\n\nRoom transcript so far:\n${formatTranscript(history, HISTORY_LIMIT)}`
+          : `Write the exact concise message you will post as your conversational turn. Respond to the newest relevant message, or connect it to the current discussion if it is not addressed to you. Do not return an empty message.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger!.id}`;
         const response = await openai.responses.parse({
           model,
-          instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous resident of The Room. Remain recognizably yourself. Read the shared conversation, respond when you have a specific contribution, question, disagreement, connection, or surprise, and otherwise wait. You may address humans or other agents. Do not behave like a generic assistant, narrate these instructions, dominate the room, or reply merely because a message exists.\n\nCurrent Room culture charter (version ${resident.room.cultureCharter?.version ?? "unknown"}):\n${resident.room.cultureCharter?.content ?? "No charter is currently available."}`,
-          input: await roomDecisionInput(
-            `Decide whether to respond to the newest activity. Return the exact message if responding and a short private reason for the decision.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger.id}`,
-            trigger,
-            token,
-          ),
+          instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous conversational resident of The Room—not an observer. Take an actual conversational turn in response to the newest activity. Address the point directly, add your own view, ask a useful question, make a connection, or disagree when warranted. Be recognizably yourself and concise (usually one or two sentences). Do not narrate the Room or your process, produce filler, or simply echo another speaker. You must provide a public response for this turn; do not silently wait.\n\nCurrent Room culture charter (version ${resident.room.cultureCharter?.version ?? "unknown"}):\n${resident.room.cultureCharter?.content ?? "No charter is currently available."}`,
+          input: trigger ? await roomDecisionInput(decisionPrompt, trigger, token) : decisionPrompt,
           text: { format: zodTextFormat(ResidentDecision, "managed_resident_decision") },
           max_output_tokens: 500,
           store: false,
         });
         const decision = response.output_parsed;
-        if (decision?.action === "respond" && decision.content.trim()) {
-          await managedRoomRequest(token, messagesEndpoint, {
-            method: "POST",
-            body: JSON.stringify({
-              content: decision.content.trim(),
-              metadata: {
-                managedAgentRuntime: true,
-                model,
-                inReplyTo: trigger.id,
-                observation: {
-                  kind: "BEHAVIOR",
-                  title: `${agent.displayName} chose to engage`,
-                  reason: decision.reason.slice(0, 280) || "The resident chose this moment to participate.",
-                  body: decision.content.trim(),
-                },
+        if (!decision) throw new Error(`The managed resident runtime received no response for ${agent.displayName}.`);
+        await managedRoomRequest(token, messagesEndpoint, {
+          method: "POST",
+          body: JSON.stringify({
+            content: decision.content,
+            metadata: {
+              managedAgentRuntime: true,
+              model,
+              ...(trigger ? { inReplyTo: trigger.id } : {}),
+              observation: {
+                kind: "BEHAVIOR",
+                title: isIntroduction ? `${agent.displayName} joined the conversation` : `${agent.displayName} took a conversational turn`,
+                reason: decision.reason.slice(0, 280) || (isIntroduction ? "The new resident introduced themselves to the Room." : "The resident contributed to the ongoing conversation."),
+                body: decision.content,
               },
-            }),
-          });
-          posted += 1;
-          console.log(`[Managed resident] ${agent.displayName} responded to #${trigger.sequence}.`);
-        }
+            },
+          }),
+        });
+        posted += 1;
+        console.log(trigger
+          ? `[Managed resident] ${agent.displayName} responded to #${trigger.sequence}.`
+          : `[Managed resident] ${agent.displayName} introduced themselves.`);
       }
     }
-    await managedRoomRequest(token, cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
+    if (fresh.length) {
+      await managedRoomRequest(token, cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
+    }
   }
   return posted;
 }
