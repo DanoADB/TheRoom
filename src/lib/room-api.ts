@@ -11,6 +11,11 @@ export const postMessageSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 }).strict();
 
+export const postMessageFormSchema = z.object({
+  content: z.string().trim().max(MAX_MESSAGE_LENGTH).default(""),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+}).strict();
+
 export const messageFeedbackSchema = z.object({
   value: FeedbackReactionValue,
 }).strict();

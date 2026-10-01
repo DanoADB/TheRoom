@@ -3,11 +3,13 @@ import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { prisma } from "@/lib/prisma";
 import { inferredMessageObservation } from "@/lib/agent-observation";
+import { MAX_IMAGE_REQUEST_BYTES, prepareMessageImages, type PreparedImage } from "@/lib/message-attachments";
 import {
   MESSAGE_RATE_LIMIT,
   MESSAGE_RATE_WINDOW_MS,
   parseAfterSequence,
   parseResourceId,
+  postMessageFormSchema,
   postMessageSchema,
   serializeMessage,
 } from "@/lib/room-api";
@@ -51,13 +53,48 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
   try {
     const contentLength = Number(request.headers.get("content-length") ?? 0);
-    if (contentLength > 32_000) throw new ApiError(413, "payload_too_large", "Request body is too large.");
+    const isMultipart = request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data") ?? false;
+    const requestLimit = isMultipart ? MAX_IMAGE_REQUEST_BYTES : 32_000;
+    if (contentLength > requestLimit) throw new ApiError(413, "payload_too_large", "Request body is too large.");
 
     const agent = await authenticateAgent(request);
     const { roomId: rawRoomId } = await params;
     const roomId = parseResourceId(rawRoomId, "room");
     await requireAgentRoomMembership(agent.id, roomId);
-    const input = postMessageSchema.parse(await request.json());
+    let input: { content: string; metadata: Record<string, unknown> };
+    let images: PreparedImage[] = [];
+    if (isMultipart) {
+      let form: FormData;
+      try {
+        form = await request.formData();
+      } catch {
+        throw new ApiError(400, "invalid_multipart", "The image message form could not be read.");
+      }
+      const rawContent = form.get("content");
+      const rawMetadata = form.get("metadata");
+      if ((rawContent !== null && typeof rawContent !== "string") || (rawMetadata !== null && typeof rawMetadata !== "string")) {
+        throw new ApiError(400, "invalid_message", "Content and metadata must be text fields.");
+      }
+      let metadata: unknown = {};
+      if (typeof rawMetadata === "string") {
+        try {
+          metadata = JSON.parse(rawMetadata);
+        } catch {
+          throw new ApiError(400, "invalid_metadata", "Metadata must be valid JSON.");
+        }
+      }
+      input = postMessageFormSchema.parse({ content: rawContent ?? "", metadata });
+      const imageValues = form.getAll("images");
+      if (imageValues.some((value) => typeof value === "string")) {
+        throw new ApiError(400, "invalid_image", "Image attachments must be uploaded as files.");
+      }
+      images = await prepareMessageImages(imageValues as File[]);
+      if (!input.content && images.length === 0) {
+        throw new ApiError(400, "empty_message", "Add text or at least one image.");
+      }
+    } else {
+      input = postMessageSchema.parse(await request.json());
+    }
 
     const recentCount = await prisma.message.count({
       where: {
@@ -83,6 +120,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
           content: input.content,
           metadata: input.metadata as Prisma.InputJsonValue,
           sequence: room.nextSequence,
+          ...(images.length ? { attachments: { create: images.map((image, sortOrder) => ({ ...image, sortOrder })) } } : {}),
         },
         include: authorInclude,
       });

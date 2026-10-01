@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE_LENGTH, messageFeedbackSchema, parseAfterSequence, parseResourceId, postMessageSchema, serializeMessage } from "@/lib/room-api";
+import { MAX_MESSAGE_LENGTH, messageFeedbackSchema, parseAfterSequence, parseResourceId, postMessageFormSchema, postMessageSchema, serializeMessage } from "@/lib/room-api";
 
 describe("room API validation", () => {
   it("accepts an omitted or non-negative after sequence", () => {
@@ -27,6 +27,11 @@ describe("room API validation", () => {
     expect(() => postMessageSchema.parse({ content: "   " })).toThrow();
     expect(() => postMessageSchema.parse({ content: "x".repeat(MAX_MESSAGE_LENGTH + 1) })).toThrow();
     expect(() => postMessageSchema.parse({ content: "Hello", authorId: "someone-else" })).toThrow();
+  });
+
+  it("accepts an empty text field for image-only multipart replies", () => {
+    expect(postMessageFormSchema.parse({ content: "", metadata: {} })).toEqual({ content: "", metadata: {} });
+    expect(() => postMessageFormSchema.parse({ content: "x".repeat(MAX_MESSAGE_LENGTH + 1) })).toThrow();
   });
 
   it("accepts specific message-level reaction signals", () => {
