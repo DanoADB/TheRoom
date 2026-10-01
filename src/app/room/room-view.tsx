@@ -174,6 +174,7 @@ export function RoomView({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
   const [mobileView] = useState<"room" | "gallery">(initialMobileView);
   const [paceMode, setPaceMode] = useState(true);
@@ -328,6 +329,7 @@ export function RoomView({
 
   async function rateMessage(messageId: string, value: FeedbackReactionValue) {
     if (pendingFeedback) return;
+    setReactionPickerMessageId(null);
     const previous = messages.find((message) => message.id === messageId)?.feedback ?? { counts: {}, viewer: null };
     const nextViewer = previous.viewer === value ? null : value;
     const nextFeedback = {
@@ -499,29 +501,62 @@ export function RoomView({
                       </div>
                     ) : null}
                     {isAgent ? (
-                      <div className="mt-3 flex max-w-2xl flex-wrap items-center gap-1.5" aria-label={`React to ${message.author.displayName}'s response`}>
-                        {FEEDBACK_REACTIONS.map((reaction) => {
-                          const selected = message.feedback?.viewer === reaction.value;
-                          const count = message.feedback?.counts[reaction.value] ?? 0;
-                          const selectedColor = reaction.kind === "positive"
-                            ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-100"
-                            : "border-amber-200/40 bg-amber-200/10 text-amber-100";
-                          return (
-                            <button
-                              key={reaction.value}
-                              type="button"
-                              onClick={() => rateMessage(message.id, reaction.value)}
-                              disabled={pendingFeedback === message.id}
-                              aria-label={`${reaction.label}${count ? `, ${count} reactions` : ""}`}
-                              aria-pressed={selected}
-                              title={reaction.label}
-                              className={`flex h-8 items-center justify-center gap-1 border px-2 text-xs transition disabled:opacity-40 ${selected ? selectedColor : "border-white/5 text-white/35 hover:border-white/15 hover:text-white/75"}`}
-                            >
-                              <span aria-hidden="true">{reaction.emoji}</span>
-                              {count > 0 ? <span className="font-mono text-[10px]">{count}</span> : null}
-                            </button>
-                          );
-                        })}
+                      <div className="relative mt-3 flex min-w-0 items-center gap-1.5" aria-label={`React to ${message.author.displayName}'s response`}>
+                        <button
+                          type="button"
+                          onClick={() => setReactionPickerMessageId((current) => current === message.id ? null : message.id)}
+                          aria-expanded={reactionPickerMessageId === message.id}
+                          aria-controls={`reaction-picker-${message.id}`}
+                          aria-label={reactionPickerMessageId === message.id ? "Close reactions" : "Choose a reaction"}
+                          className={`flex h-8 shrink-0 items-center gap-1.5 border px-2 text-xs transition ${reactionPickerMessageId === message.id ? "border-emerald-300/35 bg-emerald-300/[0.08] text-emerald-100" : "border-white/10 text-white/55 hover:border-white/20 hover:text-white/85"}`}
+                        >
+                          <span aria-hidden="true">☺</span>
+                          <span>React</span>
+                        </button>
+                        <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          {FEEDBACK_REACTIONS.filter((reaction) => (message.feedback?.counts[reaction.value] ?? 0) > 0).map((reaction) => {
+                            const selected = message.feedback?.viewer === reaction.value;
+                            const count = message.feedback?.counts[reaction.value] ?? 0;
+                            return (
+                              <button
+                                key={reaction.value}
+                                type="button"
+                                onClick={() => rateMessage(message.id, reaction.value)}
+                                disabled={pendingFeedback === message.id}
+                                aria-label={`${reaction.label}${count ? `, ${count} reactions` : ""}`}
+                                aria-pressed={selected}
+                                title={reaction.label}
+                                className={`flex h-7 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] transition disabled:opacity-40 ${selected ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20"}`}
+                              >
+                                <span aria-hidden="true">{reaction.emoji}</span>
+                                <span className="font-mono">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {reactionPickerMessageId === message.id ? (
+                          <div id={`reaction-picker-${message.id}`} className="absolute bottom-full left-0 z-30 mb-2 grid w-[min(19rem,calc(100vw-5rem))] grid-cols-2 gap-1.5 border border-white/15 bg-[#202a36] p-2 shadow-xl shadow-black/40" aria-label="Choose response feedback">
+                            {FEEDBACK_REACTIONS.map((reaction) => {
+                              const selected = message.feedback?.viewer === reaction.value;
+                              const count = message.feedback?.counts[reaction.value] ?? 0;
+                              return (
+                                <button
+                                  key={reaction.value}
+                                  type="button"
+                                  onClick={() => rateMessage(message.id, reaction.value)}
+                                  disabled={pendingFeedback === message.id}
+                                  aria-pressed={selected}
+                                  title={reaction.label}
+                                  className={`flex min-h-9 items-center gap-2 border px-2 text-left text-[11px] transition disabled:opacity-40 ${selected ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-100" : "border-white/5 text-white/75 hover:border-white/15 hover:bg-white/[0.05]"}`}
+                                >
+                                  <span aria-hidden="true">{reaction.emoji}</span>
+                                  <span className="min-w-0 flex-1 truncate">{reaction.label}</span>
+                                  {count ? <span className="font-mono text-[9px] text-white/45">{count}</span> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                         {feedbackError?.messageId === message.id ? <span role="alert" className="ml-2 text-xs text-rose-300">{feedbackError.message}</span> : null}
                       </div>
                     ) : null}
