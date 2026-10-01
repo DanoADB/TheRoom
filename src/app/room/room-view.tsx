@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RoomMobileNav } from "@/components/room-mobile-nav";
 
 type RoomMessage = {
   id: string;
@@ -171,7 +172,7 @@ export function RoomView({
   const [error, setError] = useState("");
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
-  const [mobileView, setMobileView] = useState<"room" | "gallery">(initialMobileView);
+  const [mobileView] = useState<"room" | "gallery">(initialMobileView);
   const [paceMode, setPaceMode] = useState(true);
   const [feedPaused, setFeedPaused] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -353,11 +354,6 @@ export function RoomView({
     }
   }
 
-  function selectMobileView(view: "room" | "gallery") {
-    setMobileView(view);
-    window.history.replaceState(null, "", view === "gallery" ? "/room?view=gallery" : "/room");
-  }
-
   return (
     <main className={`min-h-screen bg-[#090b0f] text-[#f4f1e8] lg:grid lg:grid-cols-[260px_minmax(0,1fr)] ${paceMode ? "pace-mode" : ""}`}>
       <aside className="hidden border-r border-white/10 bg-[#0d1015] p-7 lg:flex lg:flex-col">
@@ -391,7 +387,7 @@ export function RoomView({
         <button onClick={logout} className="mt-auto text-left text-xs text-white/35 transition hover:text-white/70">Leave as {currentUser.displayName}</button>
       </aside>
 
-      <section className="flex h-[100dvh] min-w-0 flex-col lg:h-screen">
+      <section className="flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] min-w-0 flex-col lg:h-screen">
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d1015]/90 px-5 backdrop-blur sm:px-8">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
@@ -625,57 +621,8 @@ export function RoomView({
           </form>
         </footer>
 
-        <nav className="grid shrink-0 grid-cols-4 border-t border-white/10 bg-[#0d1015] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Room navigation">
-          <button
-            type="button"
-            onClick={() => selectMobileView("room")}
-            aria-current={mobileView === "room" ? "page" : undefined}
-            className={`flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "room" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
-              <path d="M4 5.5h16v11H9l-5 3v-14Z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Room</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMobileView("gallery")}
-            aria-current={mobileView === "gallery" ? "page" : undefined}
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 transition ${mobileView === "gallery" ? "bg-emerald-300/[0.06] text-emerald-200" : "text-white/35 hover:text-white/65"}`}
-          >
-            <span className="relative">
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
-                <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="m18.5 16 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {curiosities.length > 0 ? (
-                <span className="absolute -right-3 -top-2 min-w-4 rounded-full bg-emerald-200 px-1 text-center font-mono text-[8px] leading-4 text-[#0b0d10]">
-                  {curiosities.length > 99 ? "99+" : curiosities.length}
-                </span>
-              ) : null}
-            </span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Gallery</span>
-          </button>
-          <Link
-            href="/activity"
-            className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
-              <path d="M4 18V9m5 9V5m5 13v-7m5 7V3" strokeLinecap="round" />
-            </svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Activity</span>
-          </Link>
-          <Link
-            href="/governance"
-            className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6">
-              <path d="M12 3v18M5 7h14M7 7l-3 6h6L7 7Zm10 0-3 6h6l-3-6ZM8 21h8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Culture</span>
-          </Link>
-        </nav>
       </section>
+      <RoomMobileNav current={mobileView === "gallery" ? "gallery" : "room"} galleryCount={curiosities.length} />
     </main>
   );
 }

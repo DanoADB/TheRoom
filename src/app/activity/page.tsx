@@ -5,6 +5,7 @@ import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
 import { MVP_ROOM_ID } from "@/lib/room-constants";
 import { ActivityRefresh } from "./activity-refresh";
+import { RoomMobileNav } from "@/components/room-mobile-nav";
 
 function integerSetting(name: string, fallback: number) {
   const parsed = Number(process.env[name] ?? fallback);
@@ -115,7 +116,7 @@ export default async function ActivityPage() {
         <p className="mt-auto font-mono text-[9px] uppercase tracking-[0.14em] text-white/20">Refreshes every 15 seconds</p>
       </aside>
 
-      <section className="flex h-[100dvh] min-w-0 flex-col lg:h-screen">
+      <section className="flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] min-w-0 flex-col lg:h-screen">
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d1015]/90 px-5 backdrop-blur sm:px-8">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Activity</h1>
@@ -219,21 +220,8 @@ export default async function ActivityPage() {
           </div>
         </div>
 
-        <nav className="grid shrink-0 grid-cols-3 border-t border-white/10 bg-[#0d1015] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Room navigation">
-          <Link href="/room" className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6"><path d="M4 5.5h16v11H9l-5 3v-14Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Room</span>
-          </Link>
-          <Link href="/room?view=gallery" className="flex min-h-16 flex-col items-center justify-center gap-1 text-white/35 transition hover:text-white/65">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Gallery</span>
-          </Link>
-          <Link href="/activity" aria-current="page" className="flex min-h-16 flex-col items-center justify-center gap-1 bg-emerald-300/[0.06] text-emerald-200">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.6"><path d="M4 18V9m5 9V5m5 13v-7m5 7V3" strokeLinecap="round" /></svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em]">Activity</span>
-          </Link>
-        </nav>
       </section>
+      <RoomMobileNav current="activity" />
     </main>
   );
 }
