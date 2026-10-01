@@ -16,7 +16,7 @@ function formatTime(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function PrivateIslaView({ initialMessages }: { initialMessages: PrivateMessage[] }) {
+export function PrivateIslaView({ initialMessages, viewerId }: { initialMessages: PrivateMessage[]; viewerId: string }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");
@@ -101,7 +101,7 @@ export function PrivateIslaView({ initialMessages }: { initialMessages: PrivateM
         </div>
         <footer className="shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6"><form onSubmit={send} className="mx-auto max-w-3xl"><div className="flex items-end gap-3 border border-white/10 bg-black/20 p-2 focus-within:border-violet-200/30"><textarea value={content} onChange={(event) => setContent(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={1} maxLength={8_000} placeholder="Message Isla privately…" className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-white/80 outline-none placeholder:text-white/25" /><button disabled={pending || !content.trim()} className="h-11 bg-[#f4f1e8] px-5 text-xs font-bold uppercase tracking-[0.12em] text-[#0b0d10] disabled:opacity-25">{pending ? "Sending" : "Send"}</button></div>{error ? <p role="alert" className="mt-2 text-xs text-rose-300">{error}</p> : null}</form></footer>
       </section>
-      <RoomMobileNav current="private" showPrivate />
+      <RoomMobileNav current="private" viewerId={viewerId} showPrivate />
     </main>
   );
 }

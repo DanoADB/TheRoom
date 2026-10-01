@@ -238,10 +238,14 @@ async function loadInterestSeed() {
   return AgentInterestList.parse(JSON.parse(await readFile(seedPath, "utf8")));
 }
 
-async function saveCuriosity(interests: AgentInterestValue[], recordResearch: boolean) {
+async function saveCuriosity(
+  interests: AgentInterestValue[],
+  recordResearch: boolean,
+  researchEntry?: { roomId: string; title: string; reason: string; body: string },
+) {
   const body = await roomRequest(interestsEndpoint, {
     method: "PUT",
-    body: JSON.stringify({ interests, recordResearch }),
+    body: JSON.stringify({ interests, recordResearch, ...(researchEntry ? { researchEntry } : {}) }),
   });
   return body.curiosity as CuriosityState;
 }
@@ -417,6 +421,18 @@ async function runAuthorizedCodeChange(request: string, reason: string, reposito
   }
   const result = await runCodeAgent(openai, codeModel, githubWorkspace, request, origin);
   const link = result.pullRequest ? `\n\n${result.pullRequest.url}` : "";
+  if (origin === "autonomous" && result.pullRequest) {
+    try {
+      await recordObservation(
+        "SELF_CHANGE",
+        `Isla changed ${githubWorkspace.fullName}`,
+        reason.trim(),
+        `${result.message}${link}`,
+      );
+    } catch (error) {
+      console.error(`[Isla] code change succeeded but its Gallery/Activity record failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
   const capacityNotice = origin === "autonomous" && result.pullRequest
     ? approachingCodeCapacityMessage(used + 1, MAX_CODE_CHANGES_PER_DAY)
     : "";
@@ -481,8 +497,12 @@ async function maybeExploreWorld(profile: string) {
   });
   const decision = decisionResponse.output_parsed;
   if (!decision) throw new Error("OpenAI returned no parsed world-curiosity decision.");
-  await saveCuriosity(decision.interests, true);
-  await recordObservation("RESEARCH", decision.galleryTitle, decision.reason.trim() || "Isla followed an interest beyond the room.", withSources(decision.galleryEntry, sources));
+  await saveCuriosity(decision.interests, true, {
+    roomId: ROOM_ID,
+    title: decision.galleryTitle,
+    reason: decision.reason.trim() || "Isla followed an interest beyond the room.",
+    body: withSources(decision.galleryEntry, sources),
+  });
   const privateHistory = await fetchPrivateContext();
   const mayPost = MAX_PROACTIVE_POSTS_PER_DAY > 0 && countToday(history, "proactive") + countToday(privateHistory, "proactive") < MAX_PROACTIVE_POSTS_PER_DAY;
   if (!mayPost) {
@@ -567,6 +587,11 @@ async function main() {
   let lastAdmissionCheckAt = 0;
   let lastManagedAgentCheckAt = 0;
   let lastFeedbackDigestCheckAt = 0;
+  const checkWorldResearch = async () => {
+    if (Date.now() - lastWorldCheckAt < PROACTIVE_CHECK_MS) return;
+    lastWorldCheckAt = Date.now();
+    if (await maybeExploreWorld(profile)) responses += 1;
+  };
   console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
@@ -616,10 +641,7 @@ async function main() {
         await maybePostFeedbackDigest();
       }
       if (!fresh.length) {
-        if (Date.now() - lastWorldCheckAt >= PROACTIVE_CHECK_MS) {
-          lastWorldCheckAt = Date.now();
-          if (await maybeExploreWorld(profile)) responses += 1;
-        }
+        await checkWorldResearch();
         if (Date.now() - lastProactiveCheckAt >= PROACTIVE_CHECK_MS) {
           lastProactiveCheckAt = Date.now();
           if (await maybeActProactively(profile, isla.id)) responses += 1;
@@ -632,6 +654,7 @@ async function main() {
       if (!trigger) {
         await roomRequest(cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
         cursor = newestSequence;
+        await checkWorldResearch();
         continue;
       }
 
@@ -669,6 +692,7 @@ async function main() {
 
       await roomRequest(cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
       cursor = newestSequence;
+      await checkWorldResearch();
     } catch (error) {
       console.error(`[Isla] ${error instanceof Error ? error.message : error}`);
       await sleep(POLL_MS * 2);

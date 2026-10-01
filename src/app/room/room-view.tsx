@@ -658,7 +658,7 @@ export function RoomView({
         </footer>
 
       </section>
-      <RoomMobileNav current={mobileView === "gallery" ? "gallery" : "room"} galleryCount={curiosities.length} showPrivate={canOpenPrivate} />
+      <RoomMobileNav current={mobileView === "gallery" ? "gallery" : "room"} viewerId={currentUser.id} showPrivate={canOpenPrivate} />
     </main>
   );
 }

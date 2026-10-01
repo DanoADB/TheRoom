@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { apiErrorResponse, ApiError } from "@/lib/api-errors";
-import { authenticateAgent } from "@/lib/agent-auth";
+import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { AgentInterestList, curiosityUpdateSchema } from "@/lib/agent-curiosity";
 import { prisma } from "@/lib/prisma";
 
@@ -26,6 +26,7 @@ export async function PUT(request: Request) {
   try {
     const agent = await authenticateAgent(request);
     const input = curiosityUpdateSchema.parse(await request.json());
+    if (input.researchEntry) await requireAgentRoomMembership(agent.id, input.researchEntry.roomId);
     const today = new Date().toISOString().slice(0, 10);
     const existing = await prisma.agentCuriosity.findUnique({ where: { agentId: agent.id } });
     const previous = AgentInterestList.safeParse(existing?.interests ?? []);
@@ -54,9 +55,9 @@ export async function PUT(request: Request) {
         },
         select: { lastExploredAt: true, researchDay: true, researchCount: true, updatedAt: true },
       });
-      if (changed.length) {
+      if (changed.length || input.researchEntry) {
         const memberships = await tx.roomMembership.findMany({ where: { agentId: agent.id }, select: { roomId: true } });
-        if (memberships.length) {
+        if (changed.length && memberships.length) {
           await tx.roomCuriosity.createMany({
             data: memberships.flatMap(({ roomId }) => changed.map((interest) => ({
               roomId,
@@ -66,6 +67,18 @@ export async function PUT(request: Request) {
               reason: interest.why.slice(0, 280),
               sourceMessage: `Why: ${interest.why}\n\nOpen question: ${interest.nextQuestion}\n\nOrigin: ${interest.origin} · Strength: ${interest.strength}/5`,
             }))),
+          });
+        }
+        if (input.researchEntry) {
+          await tx.roomCuriosity.create({
+            data: {
+              roomId: input.researchEntry.roomId,
+              agentId: agent.id,
+              kind: "RESEARCH",
+              title: input.researchEntry.title,
+              reason: input.researchEntry.reason,
+              sourceMessage: input.researchEntry.body,
+            },
           });
         }
       }

@@ -15,7 +15,7 @@ export default async function PrivateIslaPage() {
       agent: { select: { id: true, displayName: true, type: true } },
     },
   });
-  return <PrivateIslaView initialMessages={messages.reverse().map((message) => {
+  return <PrivateIslaView viewerId={user.id} initialMessages={messages.reverse().map((message) => {
     const author = message.user ?? message.agent;
     if (!author) throw new Error(`Private message ${message.id} has no author.`);
     return { id: message.id, sequence: message.sequence, timestamp: message.createdAt.toISOString(), content: message.content, author: { id: author.id, displayName: author.displayName, type: author.type.toLowerCase() } };

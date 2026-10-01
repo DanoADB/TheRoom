@@ -5,6 +5,7 @@ import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { serializeMessage } from "@/lib/room-api";
 import { buildRoomGallery } from "@/lib/room-gallery";
 import { AgentInterestList } from "@/lib/agent-curiosity";
+import { RoomRefresh } from "./room-refresh";
 import { RoomView } from "./room-view";
 
 export default async function RoomPage({ searchParams }: PageProps<"/room">) {
@@ -96,6 +97,8 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
   const curiosities = buildRoomGallery(room.curiosities, galleryItems, currentInterests);
 
   return (
+    <>
+    <RoomRefresh />
     <RoomView
       room={{ id: room.id, name: room.name }}
       currentUser={{ id: user.id, displayName: user.displayName }}
@@ -106,5 +109,6 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
       initialSequence={room.nextSequence}
       initialMobileView={initialMobileView}
     />
+    </>
   );
 }

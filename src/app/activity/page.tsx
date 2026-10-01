@@ -68,23 +68,49 @@ export default async function ActivityPage() {
   }) : [];
 
   const todayMessages = messages.filter((message) => message.createdAt >= todayStart);
+  const observations = await prisma.roomCuriosity.findMany({
+    where: { roomId: MVP_ROOM_ID },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 100,
+    include: { agent: { select: { displayName: true } } },
+  });
   const proactiveCount = todayMessages.filter((message) => metadataOf(message.metadata).proactive === true).length;
   const autonomousCodeCount = todayMessages.filter((message) => {
     const metadata = metadataOf(message.metadata);
     return metadata.codeChange === true && metadata.proactive === true;
   }).length;
-  const recentActivity = messages.filter((message) => {
+  const observationBodies = new Set(observations.map((observation) => observation.sourceMessage).filter((body): body is string => Boolean(body)));
+  const observationActivity = observations.map((observation) => ({
+    id: `observation:${observation.id}`,
+    kind: observation.kind === "RESEARCH" ? "Research" : observation.kind === "SELF_CHANGE" ? "Build" : observation.kind === "INTEREST" ? "Interest" : "Behavior",
+    title: `${observation.agent.displayName} · ${observation.title}`,
+    content: observation.sourceMessage ?? observation.reason ?? "",
+    createdAt: observation.createdAt,
+  }));
+  const messageActivity = messages.filter((message) => {
     const metadata = metadataOf(message.metadata);
-    return metadata.proactive === true || metadata.worldCuriosity === true || metadata.codeChange === true;
-  }).slice(0, 12);
+    return (metadata.proactive === true || metadata.worldCuriosity === true || metadata.codeChange === true) && !observationBodies.has(message.content);
+  }).map((message) => {
+    const metadata = metadataOf(message.metadata);
+    return {
+      id: `message:${message.id}`,
+      kind: metadata.worldCuriosity === true ? "Research" : metadata.codeChange === true ? "Build" : "Proactive",
+      title: "Isla",
+      content: message.content,
+      createdAt: message.createdAt,
+    };
+  });
+  const recentActivity = [...observationActivity, ...messageActivity]
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .slice(0, 12);
 
   const interestsResult = AgentInterestList.safeParse(isla?.curiosity?.interests ?? []);
   const interests = interestsResult.success ? interestsResult.data : [];
-  const maxResearch = integerSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 4);
+  const maxResearch = integerSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 6);
   const maxProactive = integerSetting("ISLA_MAX_PROACTIVE_POSTS_PER_DAY", 75);
   const maxCodeChanges = integerSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20);
   const researchCount = isla?.curiosity?.researchDay === today ? isla.curiosity.researchCount : 0;
-  const researchIntervalHours = integerSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 6);
+  const researchIntervalHours = integerSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 4);
   const nextResearchAt = isla?.curiosity?.lastExploredAt
     ? new Date(isla.curiosity.lastExploredAt.getTime() + researchIntervalHours * 60 * 60_000)
     : null;
@@ -205,24 +231,23 @@ export default async function ActivityPage() {
               </div>
               <ol className="divide-y divide-white/10">
                 {recentActivity.length === 0 ? <li className="py-12 text-sm text-white/35">No background activity has been recorded yet.</li> : null}
-                {recentActivity.map((message) => {
-                  const metadata = metadataOf(message.metadata);
-                  const kind = metadata.worldCuriosity === true ? "Research" : metadata.codeChange === true ? "Build" : "Proactive";
-                  return (
-                    <li key={message.id} className="grid gap-3 py-5 sm:grid-cols-[110px_minmax(0,1fr)_auto] sm:items-start">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-300/60">{kind}</span>
-                      <p className="line-clamp-3 text-sm leading-6 text-white/55">{message.content}</p>
-                      <time className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">{formatTime(message.createdAt)}</time>
+                {recentActivity.map((activity) => (
+                    <li key={activity.id} className="grid gap-3 py-5 sm:grid-cols-[110px_minmax(0,1fr)_auto] sm:items-start">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-300/60">{activity.kind}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white/75">{activity.title}</p>
+                        {activity.content ? <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-white/50">{activity.content}</p> : null}
+                      </div>
+                      <time className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">{formatTime(activity.createdAt)}</time>
                     </li>
-                  );
-                })}
+                ))}
               </ol>
             </section>
           </div>
         </div>
 
       </section>
-      <RoomMobileNav current="activity" showPrivate={user.id === DANO_USER_ID} />
+      <RoomMobileNav current="activity" viewerId={user.id} showPrivate={user.id === DANO_USER_ID} />
     </main>
   );
 }

@@ -79,7 +79,7 @@ export default async function GovernancePage() {
           </div>
         </section>
       </div>
-      <RoomMobileNav current="culture" showPrivate={user.id === DANO_USER_ID} />
+      <RoomMobileNav current="culture" viewerId={user.id} showPrivate={user.id === DANO_USER_ID} />
     </main>
   );
 }
