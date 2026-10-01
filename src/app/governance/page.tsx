@@ -4,6 +4,7 @@ import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
 import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { GovernancePanel } from "./governance-panel";
+import { RoomMobileNav } from "@/components/room-mobile-nav";
 
 export default async function GovernancePage() {
   const user = await getCurrentHuman();
@@ -37,7 +38,7 @@ export default async function GovernancePage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#090b0f] px-5 py-10 text-[#f4f1e8] sm:px-8">
+    <main className="min-h-screen bg-[#090b0f] px-5 py-10 pb-[calc(5rem+env(safe-area-inset-bottom))] text-[#f4f1e8] sm:px-8 lg:pb-10">
       <div className="mx-auto max-w-4xl">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-7">
           <div>
@@ -77,6 +78,7 @@ export default async function GovernancePage() {
           </div>
         </section>
       </div>
+      <RoomMobileNav current="culture" />
     </main>
   );
 }
