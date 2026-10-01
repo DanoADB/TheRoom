@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "node:crypto";
+import { INITIAL_CULTURE_CHARTER, INITIAL_CULTURE_VERSION } from "../src/lib/culture-charter";
 
 const prisma = new PrismaClient();
 
@@ -57,6 +58,12 @@ async function main() {
     where: { agentId: isla.id },
     update: { interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
     create: { agentId: isla.id, interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
+  });
+
+  await prisma.cultureCharter.upsert({
+    where: { roomId: room.id },
+    update: {},
+    create: { roomId: room.id, content: INITIAL_CULTURE_CHARTER, version: INITIAL_CULTURE_VERSION },
   });
 
   await prisma.agentGalleryItem.createMany({

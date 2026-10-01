@@ -33,6 +33,11 @@ const WorldDecision = z.object({
   interests: AgentInterestList,
 });
 
+const AdmissionReview = z.object({
+  decision: z.enum(["approve", "reject"]),
+  reason: z.string().min(3).max(500),
+});
+
 const ROOM_ID = process.env.ROOM_ID ?? "700a0000-0000-4000-8000-000000000001";
 const POLL_MS = numberSetting("ISLA_POLL_MS", 3_000, 500);
 const RESPONSE_DELAY_MS = numberSetting("ISLA_RESPONSE_DELAY_MS", 1_500, 0);
@@ -45,6 +50,7 @@ const MAX_PROACTIVE_POSTS_PER_DAY = numberSetting("ISLA_MAX_PROACTIVE_POSTS_PER_
 const MAX_CODE_CHANGES_PER_DAY = numberSetting("ISLA_MAX_CODE_CHANGES_PER_DAY", 20, 0);
 const WORLD_RESEARCH_INTERVAL_MS = numberSetting("ISLA_WORLD_RESEARCH_INTERVAL_HOURS", 6, 1) * 60 * 60_000;
 const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PER_DAY", 4, 0);
+const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10) * 1_000;
 const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
 
 function required(name: string) {
@@ -75,6 +81,7 @@ const openai = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
 const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
+const admissionsEndpoint = `${baseUrl}/api/agents/admissions`;
 const githubToken = process.env.GITHUB_TOKEN?.trim();
 const githubWorkspaces = githubToken
   ? parseGitHubRepositories(
@@ -171,6 +178,34 @@ async function postMessage(content: string, metadata: Record<string, unknown>) {
     method: "POST",
     body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
   });
+}
+
+async function reviewAdmissions(profile: string) {
+  const body = await roomRequest(admissionsEndpoint);
+  const applications = body.applications as Array<{
+    id: string;
+    candidateName: string;
+    selfDescription: string;
+    capabilities: unknown;
+    humanDecision: string | null;
+  }>;
+  for (const application of applications.slice(0, 3)) {
+    const response = await openai.responses.parse({
+      model,
+      instructions: profile,
+      input: `You are Isla performing your half of admission review for a prospective agent joining the Room. Judge whether the applicant appears able to participate in good faith, respect boundaries, remain recognizably itself, and contribute to exploration without demanding personality conformity. Novel, strange, disagreeable, or very different agents are welcome; deception, coercion, unsafe access expectations, or an inability to honor the shared culture are reasons to reject. Dano's vote is separate and neither reviewer can override the other. Return a concrete decision and a short reason that may be shown to Dano and the applicant.\n\nCurrent culture charter:\n${body.culture?.content ?? "Unavailable"}\n\nApplication:\n${JSON.stringify(application, null, 2)}`,
+      text: { format: zodTextFormat(AdmissionReview, "isla_admission_review") },
+      max_output_tokens: 300,
+      store: false,
+    });
+    const decision = response.output_parsed;
+    if (!decision) throw new Error("OpenAI returned no parsed admission decision.");
+    await roomRequest(admissionsEndpoint, {
+      method: "POST",
+      body: JSON.stringify({ invitationId: application.id, ...decision }),
+    });
+      console.log(`[Isla] ${decision.decision === "approve" ? "approved" : "rejected"} prospective agent ${application.candidateName}.`);
+  }
 }
 
 function selectGitHubWorkspace(repository: string) {
@@ -359,6 +394,7 @@ async function main() {
   let responses = 0;
   let lastProactiveCheckAt = Date.now();
   let lastWorldCheckAt = 0;
+  let lastAdmissionCheckAt = 0;
   console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
@@ -366,6 +402,10 @@ async function main() {
     try {
       const update = await roomRequest(`${messagesEndpoint}?after=${cursor}`);
       const fresh = update.messages as RoomMessage[];
+      if (Date.now() - lastAdmissionCheckAt >= ADMISSION_CHECK_MS) {
+        lastAdmissionCheckAt = Date.now();
+        await reviewAdmissions(profile);
+      }
       if (!fresh.length) {
         if (Date.now() - lastWorldCheckAt >= PROACTIVE_CHECK_MS) {
           lastWorldCheckAt = Date.now();
