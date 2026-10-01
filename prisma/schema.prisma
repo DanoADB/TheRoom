@@ -339,6 +339,7 @@ model AgentInvitation {
   source               String?           @db.VarChar(40)
   sourceReference      String?           @db.VarChar(120)
   provenance           Json              @default("{}")
+  archivedAt           DateTime?
 
   room            Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
   createdBy       User   @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)

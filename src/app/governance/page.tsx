@@ -25,13 +25,13 @@ export default async function GovernancePage() {
       },
     }),
     user.id === DANO_USER_ID ? prisma.agentInvitation.findMany({
-      where: { roomId: MVP_ROOM_ID },
+      where: { roomId: MVP_ROOM_ID, archivedAt: null },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
         id: true, status: true, candidateName: true, selfDescription: true, capabilities: true,
         humanDecision: true, humanDecisionReason: true, islaDecision: true, islaDecisionReason: true,
-        expiresAt: true, createdAt: true,
+        expiresAt: true, createdAt: true, archivedAt: true,
         source: true,
       },
     }) : Promise.resolve([]),
