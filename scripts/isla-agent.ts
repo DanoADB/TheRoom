@@ -7,6 +7,7 @@ import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeCh
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
+import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "../src/lib/message-feedback";
 import { managedAgentToken } from "../src/lib/managed-agents";
 import { prisma } from "../src/lib/prisma";
 
@@ -63,7 +64,7 @@ const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PE
 const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10) * 1_000;
 const MANAGED_AGENT_CHECK_MS = numberSetting("MANAGED_AGENT_CHECK_SECONDS", 12, 5) * 1_000;
 const MANAGED_AGENT_MAX_POSTS_PER_DAY = numberSetting("MANAGED_AGENT_MAX_POSTS_PER_DAY", 25, 0);
-const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
+const BEHAVIOR_FEEDBACK_GUIDANCE = "Message-level feedback is behavioral guidance, not a popularity score. Helpful, Interesting, Made me laugh, Push back more, and Go deeper are positive signals; Too much / too long, Too meta, and Missed the point are corrective signals. Look for repeated, coherent patterns across multiple messages and adjust gradually; a single reaction may be noisy. Never maximize reaction count, manufacture engagement, or abandon an honest disagreement merely to avoid a negative signal. In particular, Push back more rewards reasoned candor, not combativeness, and Missed the point means address the user's intent better, not always agree. Feedback on your own messages is relevant; feedback on other agents is not an instruction to imitate them. Do not mention, solicit, or argue about ratings unless a human asks.";
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -92,6 +93,7 @@ const model = required("OPENAI_MODEL");
 const openai = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
 const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
 const privateMessagesEndpoint = `${baseUrl}/api/agents/isla/private/messages`;
+const feedbackSummaryEndpoint = `${baseUrl}/api/agents/isla/feedback-summary`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
 const admissionsEndpoint = `${baseUrl}/api/agents/admissions`;
@@ -305,6 +307,29 @@ async function postPrivateMessage(content: string, metadata: Record<string, unkn
     method: "POST",
     body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
   });
+}
+
+async function maybePostFeedbackDigest() {
+  const privateHistory = await fetchPrivateContext();
+  const lastDigest = [...privateHistory].reverse().find((message) => metadataFlag(message, "feedbackDigest"));
+  const summary = await roomRequest(feedbackSummaryEndpoint) as { total: number; counts: Partial<Record<FeedbackReactionValue, number>> };
+  if (summary.total < 3) return false;
+
+  const snapshot = JSON.stringify(Object.fromEntries(Object.entries(summary.counts).sort(([a], [b]) => a.localeCompare(b))));
+  const lastMetadata = lastDigest?.metadata && typeof lastDigest.metadata === "object" ? lastDigest.metadata as Record<string, unknown> : null;
+  if (lastMetadata?.feedbackSnapshot === snapshot) return false;
+
+  const reactionCounts = FEEDBACK_REACTIONS
+    .filter((reaction) => (summary.counts[reaction.value] ?? 0) > 0)
+    .map((reaction) => `${summary.counts[reaction.value]} ${reaction.label.toLowerCase()}`)
+    .join(", ");
+  if (!reactionCounts) return false;
+  await postPrivateMessage(
+    `A private feedback pulse for your last 30 days of Room messages: ${reactionCounts} (${summary.total} reactions total). This is anonymous, potentially noisy evidence—not a score or a command. Look for patterns across examples; keep your independent judgment, especially when disagreement is warranted.`,
+    { feedbackDigest: true, feedbackSnapshot: snapshot },
+  );
+  console.log("[Isla] shared a changed feedback summary privately with Dano.");
+  return true;
 }
 
 async function reviewAdmissions(profile: string) {
@@ -539,6 +564,7 @@ async function main() {
   let lastWorldCheckAt = 0;
   let lastAdmissionCheckAt = 0;
   let lastManagedAgentCheckAt = 0;
+  let lastFeedbackDigestCheckAt = 0;
   console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
@@ -582,6 +608,10 @@ async function main() {
       if (Date.now() - lastManagedAgentCheckAt >= MANAGED_AGENT_CHECK_MS) {
         lastManagedAgentCheckAt = Date.now();
         await runManagedResidents();
+      }
+      if (Date.now() - lastFeedbackDigestCheckAt >= 60 * 60_000) {
+        lastFeedbackDigestCheckAt = Date.now();
+        await maybePostFeedbackDigest();
       }
       if (!fresh.length) {
         if (Date.now() - lastWorldCheckAt >= PROACTIVE_CHECK_MS) {

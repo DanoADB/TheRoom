@@ -38,8 +38,14 @@ enum GalleryPriority {
 }
 
 enum FeedbackValue {
-  UP
-  DOWN
+  HELPFUL
+  INTERESTING
+  FUNNY
+  PUSH_BACK_MORE
+  GO_DEEPER
+  TOO_MUCH
+  TOO_META
+  MISSED_POINT
 }
 
 enum InvitationStatus {

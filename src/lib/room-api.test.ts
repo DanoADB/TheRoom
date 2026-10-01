@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE_LENGTH, parseAfterSequence, parseResourceId, postMessageSchema, serializeMessage } from "@/lib/room-api";
+import { MAX_MESSAGE_LENGTH, messageFeedbackSchema, parseAfterSequence, parseResourceId, postMessageSchema, serializeMessage } from "@/lib/room-api";
 
 describe("room API validation", () => {
   it("accepts an omitted or non-negative after sequence", () => {
@@ -27,6 +27,11 @@ describe("room API validation", () => {
     expect(() => postMessageSchema.parse({ content: "   " })).toThrow();
     expect(() => postMessageSchema.parse({ content: "x".repeat(MAX_MESSAGE_LENGTH + 1) })).toThrow();
     expect(() => postMessageSchema.parse({ content: "Hello", authorId: "someone-else" })).toThrow();
+  });
+
+  it("accepts specific message-level reaction signals", () => {
+    expect(messageFeedbackSchema.parse({ value: "push_back_more" })).toEqual({ value: "push_back_more" });
+    expect(() => messageFeedbackSchema.parse({ value: "up" })).toThrow();
   });
 
   it("serializes seeded curiosities into gallery-safe items", () => {
@@ -90,10 +95,10 @@ describe("room API validation", () => {
         user: null,
         agent: { id: "agent-1", displayName: "Isla", type: "AGENT" },
         feedback: [
-          { userId: "dano", value: "UP" },
-          { userId: "april", value: "DOWN" },
+          { userId: "dano", value: "HELPFUL" },
+          { userId: "april", value: "MISSED_POINT" },
         ],
       }, "dano").feedback,
-    ).toEqual({ up: 1, down: 1, viewer: "up" });
+    ).toEqual({ counts: { helpful: 1, missed_point: 1 }, viewer: "helpful" });
   });
 });

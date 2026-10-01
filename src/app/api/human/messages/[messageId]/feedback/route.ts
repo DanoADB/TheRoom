@@ -2,7 +2,7 @@ import { z } from "zod";
 import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { requireHuman, requireHumanRoomMembership, requireSameOrigin } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
-import { messageFeedbackSchema } from "@/lib/room-api";
+import { feedbackValueToDatabase, messageFeedbackSchema } from "@/lib/room-api";
 
 function parseMessageId(value: string) {
   const parsed = z.uuid().safeParse(value);
@@ -28,7 +28,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ mess
     const messageId = parseMessageId((await params).messageId);
     await requireFeedbackTarget(messageId, user.id);
     const input = messageFeedbackSchema.parse(await request.json());
-    const value = input.value === "up" ? "UP" : "DOWN";
+    const value = feedbackValueToDatabase(input.value);
     const feedback = await prisma.messageFeedback.upsert({
       where: { messageId_userId: { messageId, userId: user.id } },
       create: { messageId, userId: user.id, value },
