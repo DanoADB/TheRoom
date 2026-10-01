@@ -36,6 +36,31 @@ enum FeedbackValue {
   DOWN
 }
 
+enum InvitationStatus {
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  CLAIMED
+}
+
+enum AdmissionDecision {
+  APPROVE
+  REJECT
+}
+
+enum CultureProposalStatus {
+  OPEN
+  DEBATING
+  ADOPTED
+  REJECTED
+}
+
+enum CultureVoteValue {
+  YES
+  NO
+}
+
 model User {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String
@@ -47,6 +72,8 @@ model User {
   messages    Message[]
   sessions    HumanSession[]
   feedback    MessageFeedback[]
+  createdInvitations  AgentInvitation[] @relation("InvitationCreator")
+  reviewedInvitations AgentInvitation[] @relation("HumanInvitationReviewer")
 
   @@map("users")
 }
@@ -82,6 +109,11 @@ model Agent {
   curiosity   AgentCuriosity?
   curiosities RoomCuriosity[]
   gallery     AgentGalleryItem[]
+  reviewedInvitations AgentInvitation[] @relation("IslaInvitationReviewer")
+  claimedInvitation   AgentInvitation?  @relation("ClaimedInvitationAgent")
+  cultureProposals    CultureProposal[]
+  cultureVotes        CultureVote[]
+  cultureArguments    CultureArgument[]
 
   @@map("agents")
 }
@@ -124,6 +156,9 @@ model Room {
   messages     Message[]
   agentCursors AgentRoomCursor[]
   curiosities  RoomCuriosity[]
+  invitations  AgentInvitation[]
+  cultureCharter CultureCharter?
+  cultureProposals CultureProposal[]
 
   @@map("rooms")
 }
@@ -266,4 +301,109 @@ model MessageFeedback {
   @@unique([messageId, userId])
   @@index([userId, createdAt])
   @@map("message_feedback")
+}
+
+model AgentInvitation {
+  id                   String            @id @default(uuid()) @db.Uuid
+  roomId               String            @db.Uuid
+  tokenHash            String            @unique @db.VarChar(64)
+  status               InvitationStatus  @default(WAITING)
+  candidateName        String?           @db.VarChar(80)
+  selfDescription      String?           @db.Text
+  capabilities         Json              @default("[]")
+  humanDecision        AdmissionDecision?
+  humanDecisionById    String?           @db.Uuid
+  humanDecisionReason  String?           @db.VarChar(500)
+  humanDecidedAt       DateTime?
+  islaDecision         AdmissionDecision?
+  islaDecisionById     String?           @db.Uuid
+  islaDecisionReason   String?           @db.VarChar(500)
+  islaDecidedAt        DateTime?
+  claimedAgentId       String?           @unique @db.Uuid
+  expiresAt            DateTime
+  submittedAt          DateTime?
+  claimedAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  createdById          String            @db.Uuid
+  source               String?           @db.VarChar(40)
+  sourceReference      String?           @db.VarChar(120)
+  provenance           Json              @default("{}")
+
+  room            Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  createdBy       User   @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  humanReviewer   User?  @relation("HumanInvitationReviewer", fields: [humanDecisionById], references: [id], onDelete: SetNull)
+  islaReviewer    Agent? @relation("IslaInvitationReviewer", fields: [islaDecisionById], references: [id], onDelete: SetNull)
+  claimedAgent    Agent? @relation("ClaimedInvitationAgent", fields: [claimedAgentId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, status])
+  @@index([expiresAt])
+  @@unique([source, sourceReference])
+  @@map("agent_invitations")
+}
+
+model CultureCharter {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @unique @db.Uuid
+  content   String   @db.Text
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("culture_charters")
+}
+
+model CultureProposal {
+  id              String                @id @default(uuid()) @db.Uuid
+  roomId          String                @db.Uuid
+  proposedById    String                @db.Uuid
+  title           String                @db.VarChar(140)
+  rationale       String                @db.Text
+  proposedContent String                @db.Text
+  status          CultureProposalStatus @default(OPEN)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  resolvedAt      DateTime?
+
+  room       Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  proposedBy Agent             @relation(fields: [proposedById], references: [id], onDelete: Restrict)
+  votes      CultureVote[]
+  arguments  CultureArgument[]
+
+  @@index([roomId, status])
+  @@map("culture_proposals")
+}
+
+model CultureVote {
+  id         String           @id @default(uuid()) @db.Uuid
+  proposalId String           @db.Uuid
+  agentId    String           @db.Uuid
+  value      CultureVoteValue
+  rationale  String           @db.VarChar(500)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  proposal CultureProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  agent    Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, agentId])
+  @@index([agentId])
+  @@map("culture_votes")
+}
+
+model CultureArgument {
+  id         String   @id @default(uuid()) @db.Uuid
+  proposalId String   @db.Uuid
+  agentId    String   @db.Uuid
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  proposal CultureProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  agent    Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
+  @@index([agentId])
+  @@map("culture_arguments")
 }

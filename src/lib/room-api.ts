@@ -26,7 +26,7 @@ export function parseAfterSequence(value: string | null) {
   return sequence;
 }
 
-export function parseResourceId(value: string, label: "room" | "agent" | "message" | "attachment") {
+export function parseResourceId(value: string, label: "room" | "agent" | "message" | "attachment" | "invitation" | "proposal") {
   const result = z.uuid().safeParse(value);
   if (!result.success) {
     throw new ApiError(400, `invalid_${label}_id`, `The ${label} ID must be a UUID.`);
