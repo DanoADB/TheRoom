@@ -25,7 +25,7 @@ type Participant = {
   status: string;
 };
 
-type RoomCuriosity = {
+type RoomGalleryItem = {
   id: string;
   kind: string;
   title: string;
@@ -33,6 +33,14 @@ type RoomCuriosity = {
   sourceMessage: string | null;
   timestamp: string;
   author: string;
+  priority: "gallery-worthy" | "needs-implementation" | "interesting-but-not-yet-worth-changing";
+};
+
+type RoomGalleryBucket = {
+  priority: RoomGalleryItem["priority"];
+  label: string;
+  description: string;
+  items: RoomGalleryItem[];
 };
 
 const OPENAI_USAGE_URL = "https://platform.openai.com/usage";
@@ -41,58 +49,43 @@ function formatTimestamp(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function CuriositiesPanel({ curiosities }: { curiosities: RoomCuriosity[] }) {
+function GalleryBuckets({ buckets }: { buckets: RoomGalleryBucket[] }) {
   return (
-    <div className="border-t border-white/10 pt-6">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/30">Gallery of Curiosity</p>
-      <ul className="mt-4 space-y-3 text-sm text-white/70">
-        {curiosities.length === 0 ? <li className="text-white/30">Nothing recorded yet.</li> : null}
-        {curiosities.map((item) => (
-          <li key={item.id} className="rounded-md border border-white/5 bg-white/[0.03] px-3 py-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-white/85">{item.title}</p>
-              <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">{item.kind}</span>
-            </div>
-            {item.reason ? <p className="mt-1 text-xs text-white/45">{item.reason}</p> : null}
-            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              {item.author} · {formatTimestamp(item.timestamp)}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function CuriosityGallery({ curiosities }: { curiosities: RoomCuriosity[] }) {
-  return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
+    <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
       <div className="border-b border-white/10 pb-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Collected by the room</p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery of Curiosity</h2>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">Questions, fascinations, and strange little threads worth keeping.</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90">Gallery priority</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/45">The gallery now carries the room&apos;s prioritization explicitly: what should be showcased, what should become implementation, and what should stay interesting without changing the room yet.</p>
       </div>
 
-      <ul className="grid gap-4 py-6 sm:grid-cols-2" aria-label="Seeded curiosities">
-        {curiosities.length === 0 ? (
-          <li className="col-span-full py-20 text-center">
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-white/25">The gallery is waiting</p>
-            <p className="mt-3 text-sm text-white/40">Nothing has caught the room&apos;s attention yet.</p>
-          </li>
-        ) : null}
-        {curiosities.map((item) => (
-          <li key={item.id} className="border border-white/10 bg-white/[0.03] p-5">
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-base font-medium leading-6 text-white/85">{item.title}</p>
-              <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {buckets.map((bucket) => (
+          <section key={bucket.priority} className="border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+              <div>
+                <h3 className="text-base font-medium text-white/85">{bucket.label}</h3>
+                <p className="mt-1 text-xs leading-5 text-white/40">{bucket.description}</p>
+              </div>
+              <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{bucket.items.length}</span>
             </div>
-            {item.reason ? <p className="mt-4 text-sm leading-6 text-white/50">{item.reason}</p> : null}
-            <p className="mt-5 border-t border-white/5 pt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              {item.author} · {formatTimestamp(item.timestamp)}
-            </p>
-          </li>
+            <ul className="mt-3 space-y-3" aria-label={`${bucket.label} items`}>
+              {bucket.items.length === 0 ? <li className="py-8 text-center text-xs text-white/25">No items yet.</li> : null}
+              {bucket.items.map((item) => (
+                <li key={item.id} className="rounded-md border border-white/5 bg-black/20 px-3 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm leading-5 text-white/85">{item.title}</p>
+                    <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">{item.kind}</span>
+                  </div>
+                  {item.reason ? <p className="mt-2 text-xs leading-5 text-white/45">{item.reason}</p> : null}
+                  <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
+                    {item.author} · {formatTimestamp(item.timestamp)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -124,7 +117,7 @@ export function RoomView({
   room: { id: string; name: string };
   currentUser: { id: string; displayName: string };
   participants: Participant[];
-  curiosities: RoomCuriosity[];
+  curiosities: RoomGalleryBucket[];
   initialMessages: RoomMessage[];
   initialSequence: number;
   initialMobileView: "room" | "gallery";
@@ -352,7 +345,10 @@ export function RoomView({
             ))}
           </ul>
         </div>
-        <CuriositiesPanel curiosities={curiosities} />
+        <div className="mt-8 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/30">Gallery priority</p>
+          <p className="mt-2 text-sm leading-6 text-white/45">The gallery is now a working surface, not a decorative appendix.</p>
+        </div>
         <button onClick={logout} className="mt-auto text-left text-xs text-white/35 transition hover:text-white/70">Leave as {currentUser.displayName}</button>
       </aside>
 
@@ -511,8 +507,8 @@ export function RoomView({
           ) : null}
         </div>
 
-        <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery of Curiosity">
-          <CuriosityGallery curiosities={curiosities} />
+        <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery priority">
+          <GalleryBuckets buckets={curiosities} />
         </section>
 
         <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6 lg:block`}>
