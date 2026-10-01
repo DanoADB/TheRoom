@@ -40,7 +40,7 @@ async function main() {
     prisma.user.upsert({ where: { id: ids.anu }, update: { displayName: "Anu", ...(anuAccessCode ? { accessCodeHash: tokenHash(anuAccessCode) } : {}) }, create: { id: ids.anu, displayName: "Anu", accessCodeHash: anuAccessCode ? tokenHash(anuAccessCode) : null } }),
     prisma.agent.upsert({ where: { id: ids.isla }, update: { displayName: "Isla", apiTokenHash: tokenHash(islaToken) }, create: { id: ids.isla, displayName: "Isla", apiTokenHash: tokenHash(islaToken) } }),
     prisma.agent.upsert({ where: { id: ids.friday }, update: { displayName: "Friday", apiTokenHash: tokenHash(fridayToken) }, create: { id: ids.friday, displayName: "Friday", apiTokenHash: tokenHash(fridayToken) } }),
-    prisma.room.upsert({ where: { id: ids.room }, update: { name: "Isla + Friday" }, create: { id: ids.room, name: "Isla + Friday" } }),
+    prisma.room.upsert({ where: { id: ids.room }, update: { name: "The Room" }, create: { id: ids.room, name: "The Room" } }),
   ]);
 
   await prisma.roomMembership.createMany({

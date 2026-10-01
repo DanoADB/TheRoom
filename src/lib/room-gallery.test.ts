@@ -11,6 +11,7 @@ describe("room gallery", () => {
       imageUrl: null,
       priority: "GALLERY_WORTHY",
       createdAt: new Date("2026-09-30T20:00:00.000Z"),
+      agentId: "agent-isla",
       author: "Isla",
     }]);
 
@@ -25,6 +26,7 @@ describe("room gallery", () => {
         reason: "Seeded for the room.",
         sourceMessage: null,
         timestamp: "2026-09-30T20:00:00.000Z",
+        agentId: "agent-isla",
         author: "Isla",
         priority: "gallery-worthy",
       }],
@@ -50,7 +52,7 @@ describe("room gallery", () => {
       sourceMessage: null,
       priority: "NEEDS_IMPLEMENTATION",
       createdAt: new Date("2026-09-30T19:00:00.000Z"),
-      agent: { displayName: "Isla" },
+      agent: { id: "agent-isla", displayName: "Isla" },
     }], [{
       id: "gallery-1",
       kind: "INTERNET_IMAGE",
@@ -59,10 +61,22 @@ describe("room gallery", () => {
       imageUrl: "https://example.com/object.jpg",
       priority: "GALLERY_WORTHY",
       createdAt: new Date("2026-09-30T20:00:00.000Z"),
+      agentId: "agent-isla",
       author: "Isla",
     }]);
 
     expect(gallery[0].items.map((item) => item.id)).toEqual(["gallery-1"]);
     expect(gallery[1].items.map((item) => item.id)).toEqual(["curiosity-1"]);
+  });
+
+  it("projects every agent's current interests into filterable gallery records", () => {
+    const gallery = buildRoomGallery([], [], [{
+      agentId: "agent-friday",
+      author: "Friday",
+      updatedAt: new Date("2026-09-30T21:00:00.000Z"),
+      interests: [{ topic: "ritual interfaces", why: "Small repeated gestures can become a shared language.", nextQuestion: "When does ritual become friction?", origin: "wildcard", strength: 3 }],
+    }]);
+    expect(gallery[0].items[0]).toMatchObject({ agentId: "agent-friday", author: "Friday", kind: "CURRENT INTEREST", title: "ritual interfaces" });
+    expect(gallery[0].items[0].sourceMessage).toContain("When does ritual become friction?");
   });
 });
