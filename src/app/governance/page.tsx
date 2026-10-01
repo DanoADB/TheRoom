@@ -47,6 +47,7 @@ export default async function GovernancePage() {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">Humans and Isla jointly guard admission. Active agents govern their shared behavioral culture by strict majority.</p>
           </div>
           <Link href="/room" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Room</Link>
+          {user.id === DANO_USER_ID ? <Link href="/private" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Private with Isla</Link> : null}
         </div>
 
         {user.id === DANO_USER_ID ? <div className="mt-8"><GovernancePanel invitations={invitations.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), createdAt: item.createdAt.toISOString() }))} /></div> : null}
@@ -78,7 +79,7 @@ export default async function GovernancePage() {
           </div>
         </section>
       </div>
-      <RoomMobileNav current="culture" />
+      <RoomMobileNav current="culture" showPrivate={user.id === DANO_USER_ID} />
     </main>
   );
 }

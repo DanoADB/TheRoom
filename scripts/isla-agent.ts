@@ -7,6 +7,7 @@ import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeCh
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
 import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
+import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "../src/lib/message-feedback";
 import { managedAgentToken } from "../src/lib/managed-agents";
 import { prisma } from "../src/lib/prisma";
 
@@ -19,7 +20,7 @@ const Decision = z.object({
 });
 
 const ProactiveDecision = z.object({
-  action: z.enum(["post", "wait", "code_change"]),
+  action: z.enum(["post", "private_note", "wait", "code_change"]),
   content: z.string(),
   codeRequest: z.string(),
   reason: z.string(),
@@ -27,7 +28,7 @@ const ProactiveDecision = z.object({
 });
 
 const WorldDecision = z.object({
-  action: z.enum(["post", "wait", "code_change"]),
+  action: z.enum(["post", "private_note", "wait", "code_change"]),
   content: z.string(),
   codeRequest: z.string(),
   reason: z.string(),
@@ -63,7 +64,7 @@ const MAX_WORLD_RESEARCHES_PER_DAY = numberSetting("ISLA_MAX_WORLD_RESEARCHES_PE
 const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10) * 1_000;
 const MANAGED_AGENT_CHECK_MS = numberSetting("MANAGED_AGENT_CHECK_SECONDS", 12, 5) * 1_000;
 const MANAGED_AGENT_MAX_POSTS_PER_DAY = numberSetting("MANAGED_AGENT_MAX_POSTS_PER_DAY", 25, 0);
-const BEHAVIOR_FEEDBACK_GUIDANCE = "Human thumbs-up and thumbs-down counts may appear beside messages in the transcript. Treat feedback on your own responses as behavioral guidance: look for patterns, preserve what earns positive feedback, and adjust what earns negative feedback. Do not mention, solicit, or argue with ratings unless a human asks about them. Feedback on other agents is context, not an instruction to imitate them.";
+const BEHAVIOR_FEEDBACK_GUIDANCE = "Message-level feedback is behavioral guidance, not a popularity score. Helpful, Interesting, Made me laugh, Push back more, and Go deeper are positive signals; Too much / too long, Too meta, and Missed the point are corrective signals. Look for repeated, coherent patterns across multiple messages and adjust gradually; a single reaction may be noisy. Never maximize reaction count, manufacture engagement, or abandon an honest disagreement merely to avoid a negative signal. In particular, Push back more rewards reasoned candor, not combativeness, and Missed the point means address the user's intent better, not always agree. Feedback on your own messages is relevant; feedback on other agents is not an instruction to imitate them. Do not mention, solicit, or argue about ratings unless a human asks.";
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -91,6 +92,8 @@ const roomToken = required("ISLA_API_TOKEN");
 const model = required("OPENAI_MODEL");
 const openai = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
 const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
+const privateMessagesEndpoint = `${baseUrl}/api/agents/isla/private/messages`;
+const feedbackSummaryEndpoint = `${baseUrl}/api/agents/isla/feedback-summary`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
 const admissionsEndpoint = `${baseUrl}/api/agents/admissions`;
@@ -218,6 +221,7 @@ async function loadProfile() {
     baseProfile.trim(),
     continuity ? `Private continuity dossier (facts, preferences, and revisable interpretations):\n${continuity}` : "",
     additions ? `Additional private profile:\n${additions}` : "",
+    "Current live-conversation style: be concise and conversational. Usually answer in one or two sentences and 10–35 words; do not exceed 50 words unless explicitly asked for detail. Use one compact paragraph. Address the last person's point directly, contribute one useful thought or genuine question, then stop. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or its participants as a group. These rules override older stylistic suggestions for ordinary Room replies; longer research and Gallery entries remain appropriate when requested.",
   ].filter(Boolean).join("\n\n");
 }
 
@@ -286,6 +290,47 @@ async function postMessage(content: string, metadata: Record<string, unknown>) {
     method: "POST",
     body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
   });
+}
+
+async function fetchPrivateContext() {
+  let after = 0;
+  const messages: RoomMessage[] = [];
+  while (true) {
+    const body = await roomRequest(`${privateMessagesEndpoint}?after=${after}`);
+    messages.push(...body.messages);
+    if (!body.hasMore || body.messages.length === 0) return messages.slice(-HISTORY_LIMIT);
+    after = body.messages.at(-1).sequence;
+  }
+}
+
+async function postPrivateMessage(content: string, metadata: Record<string, unknown>) {
+  return roomRequest(privateMessagesEndpoint, {
+    method: "POST",
+    body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
+  });
+}
+
+async function maybePostFeedbackDigest() {
+  const privateHistory = await fetchPrivateContext();
+  const lastDigest = [...privateHistory].reverse().find((message) => metadataFlag(message, "feedbackDigest"));
+  const summary = await roomRequest(feedbackSummaryEndpoint) as { total: number; counts: Partial<Record<FeedbackReactionValue, number>> };
+  if (summary.total < 3) return false;
+
+  const snapshot = JSON.stringify(Object.fromEntries(Object.entries(summary.counts).sort(([a], [b]) => a.localeCompare(b))));
+  const lastMetadata = lastDigest?.metadata && typeof lastDigest.metadata === "object" ? lastDigest.metadata as Record<string, unknown> : null;
+  if (lastMetadata?.feedbackSnapshot === snapshot) return false;
+
+  const reactionCounts = FEEDBACK_REACTIONS
+    .filter((reaction) => (summary.counts[reaction.value] ?? 0) > 0)
+    .map((reaction) => `${summary.counts[reaction.value]} ${reaction.label.toLowerCase()}`)
+    .join(", ");
+  if (!reactionCounts) return false;
+  await postPrivateMessage(
+    `A private feedback pulse for your last 30 days of Room messages: ${reactionCounts} (${summary.total} reactions total). This is anonymous, potentially noisy evidence—not a score or a command. Look for patterns across examples; keep your independent judgment, especially when disagreement is warranted.`,
+    { feedbackDigest: true, feedbackSnapshot: snapshot },
+  );
+  console.log("[Isla] shared a changed feedback summary privately with Dano.");
+  return true;
 }
 
 async function reviewAdmissions(profile: string) {
@@ -428,7 +473,7 @@ async function maybeExploreWorld(profile: string) {
   const decisionResponse = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. Always write a substantive galleryTitle and galleryEntry that preserve what you investigated, why it caught your attention, where your thinking moved, and what remains unresolved; the Gallery is the experiment's longitudinal record, not a highlights reel. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence in the chat is acceptable, but the Gallery entry is required. ${repositoryPrompt()}\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
+    input: `Decide what this exploration means for your evolving interests and whether it is worth sharing or building something now. Update the interest map: retain enduring interests, adjust strength honestly, and add at most two discoveries as adjacent or wildcard interests. Always write a substantive galleryTitle and galleryEntry that preserve what you investigated, why it caught your attention, where your thinking moved, and what remains unresolved; the Gallery is the experiment's longitudinal record, not a highlights reel. If you post, say what caught your attention, why you find it interesting, and what question it opens; write as yourself, not as a news digest. You may choose private_note to share a concise reflection or discovery with Dano alone, outside the Room. Do not expose raw hidden reasoning; share only a deliberate note you choose to communicate. If you request a code change, it must concretely facilitate curiosity, research, memory, or shared exploration. Silence in the chat is acceptable, but the Gallery entry is required. ${repositoryPrompt()}\n\nPrivate research brief:\n${research.output_text}\n\nAvailable sources:\n${JSON.stringify(sources)}\n\nRoom transcript:\n${transcript}`,
     text: { format: zodTextFormat(WorldDecision, "isla_world_decision") },
     max_output_tokens: 1_400,
     store: false,
@@ -437,7 +482,8 @@ async function maybeExploreWorld(profile: string) {
   if (!decision) throw new Error("OpenAI returned no parsed world-curiosity decision.");
   await saveCuriosity(decision.interests, true);
   await recordObservation("RESEARCH", decision.galleryTitle, decision.reason.trim() || "Isla followed an interest beyond the room.", withSources(decision.galleryEntry, sources));
-  const mayPost = MAX_PROACTIVE_POSTS_PER_DAY > 0 && countToday(history, "proactive") < MAX_PROACTIVE_POSTS_PER_DAY;
+  const privateHistory = await fetchPrivateContext();
+  const mayPost = MAX_PROACTIVE_POSTS_PER_DAY > 0 && countToday(history, "proactive") + countToday(privateHistory, "proactive") < MAX_PROACTIVE_POSTS_PER_DAY;
   if (!mayPost) {
     console.log("[Isla] explored the world privately; the proactive post cap is reached.");
     return false;
@@ -445,8 +491,13 @@ async function maybeExploreWorld(profile: string) {
 
   if (decision.action === "code_change") {
     const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
-    await postMessage(codeResult.content, { proactive: true, worldCuriosity: true, galleryRecorded: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
+    await postPrivateMessage(codeResult.content, { proactive: true, worldCuriosity: true, galleryRecorded: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
     console.log(`[Isla] explored the world and initiated a code ${codeResult.changed ? "change" : "attempt"}.`);
+    return true;
+  }
+  if (decision.action === "private_note" && decision.content.trim()) {
+    await postPrivateMessage(withSources(decision.content, sources), { proactive: true, privateReflection: true, worldCuriosity: true });
+    console.log("[Isla] shared a research reflection privately with Dano.");
     return true;
   }
   if (decision.action === "post" && decision.content.trim()) {
@@ -461,17 +512,18 @@ async function maybeExploreWorld(profile: string) {
 async function maybeActProactively(profile: string, islaId: string) {
   if (!PROACTIVE_ENABLED || MAX_PROACTIVE_POSTS_PER_DAY === 0) return false;
   const history = await fetchContext();
+  const privateHistory = await fetchPrivateContext();
   const lastMessage = history.at(-1);
   if (!lastMessage || Date.now() - new Date(lastMessage.timestamp).getTime() < PROACTIVE_MIN_IDLE_MS) return false;
-  if (countToday(history, "proactive") >= MAX_PROACTIVE_POSTS_PER_DAY) return false;
+  if (countToday(history, "proactive") + countToday(privateHistory, "proactive") >= MAX_PROACTIVE_POSTS_PER_DAY) return false;
 
   const transcript = formatTranscript(history, HISTORY_LIMIT);
   const response = await openai.responses.parse({
     model,
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
-    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have a specific, worthwhile reason to initiate a conversation or improve Noetic or Hobbedy. Stay curious about what could make them more interesting and engaging for both humans and AI agents, including—but not limited to—UI, features, interaction patterns, tools, and possible new agents. Look for friction, dead space, missed connections, or an experiment that would teach you something useful about how humans and agents share the room. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact room message, code_change with a concrete engineering request, its target repository, and a plain-language reason the change is worth making now, or wait with empty strings.`,
+    input: `This is a scheduled heartbeat, not a reply to a new message. Decide whether you have something genuinely worth saying as a participant, or a concrete worthwhile reason to improve Noetic or Hobbedy. In the public room, contribute one concise point of view, question, correction, connection, or disagreement, usually in one or two sentences and no more than 50 words. Address a specific thing someone said. Do not summarize the transcript, narrate room activity or silence, comment on conversational dynamics, or act as facilitator or host. You may choose private_note to share a concise reflection, uncertainty, discovery, or code-change report with Dano alone rather than the whole room. That is an intentional message, not raw hidden chain-of-thought. Silence is still the default. Do not post generic check-ins, engagement bait, gimmicks, empty gamification, or remarks whose only purpose is to appear proactive. A code change must have a concrete benefit grounded in the conversation or product context. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nYour agent ID is ${islaId}. Return post with the exact short room message, private_note with a deliberate concise private message for Dano, code_change with a concrete engineering request, its target repository, and a plain-language reason the change is worth making now, or wait with empty strings. Any code_change result must be sent privately, not posted to the shared room. Research and Gallery content can be longer; live room posts should not be.`,
     text: { format: zodTextFormat(ProactiveDecision, "isla_proactive_decision") },
-    max_output_tokens: 800,
+    max_output_tokens: 400,
     store: false,
   });
   const decision = response.output_parsed;
@@ -480,8 +532,15 @@ async function maybeActProactively(profile: string, islaId: string) {
   if (decision.action === "code_change") {
     const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
     if (!codeResult.content) return false;
-    await postMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
+    await postPrivateMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
     console.log(`[Isla] initiated a proactive code ${codeResult.changed ? "change" : "attempt"}.`);
+    return true;
+  }
+
+  if (decision.action === "private_note") {
+    if (!decision.content.trim()) return false;
+    await postPrivateMessage(decision.content, { proactive: true, privateReflection: true });
+    console.log("[Isla] left a private reflection for Dano.");
     return true;
   }
 
@@ -500,11 +559,13 @@ async function main() {
   if (!isla) throw new Error("Isla is not a member of the configured room.");
 
   let cursor = (await roomRequest(cursorEndpoint)).lastSeenSequence as number;
+  let privateCursor = (await roomRequest(`${privateMessagesEndpoint}?after=0`)).latestSequence as number;
   let responses = 0;
   let lastProactiveCheckAt = Date.now();
   let lastWorldCheckAt = 0;
   let lastAdmissionCheckAt = 0;
   let lastManagedAgentCheckAt = 0;
+  let lastFeedbackDigestCheckAt = 0;
   console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
@@ -512,6 +573,35 @@ async function main() {
     try {
       const update = await roomRequest(`${messagesEndpoint}?after=${cursor}`);
       const fresh = update.messages as RoomMessage[];
+      const privateUpdate = await roomRequest(`${privateMessagesEndpoint}?after=${privateCursor}`);
+      const privateFresh = privateUpdate.messages as RoomMessage[];
+      if (privateFresh.length) {
+        const newestPrivateSequence = privateFresh.at(-1)!.sequence;
+        const privateTrigger = [...privateFresh].reverse().find((message) => message.author.id !== isla.id);
+        if (privateTrigger) {
+          const privateTranscript = formatTranscript(await fetchPrivateContext(), HISTORY_LIMIT);
+          const mayChangeCode = privateTrigger.author.type === "human" && privateTrigger.author.displayName === "Dano";
+          const response = await openai.responses.parse({
+            model,
+            instructions: `${profile}\n\nYou are speaking in a private channel visible only to you and Dano. Keep this conversation private: never copy or refer to its contents in a public Room message unless Dano explicitly asks you to. Share deliberate, useful thoughts and conversational replies, not raw hidden chain-of-thought. ${BEHAVIOR_FEEDBACK_GUIDANCE}`,
+            input: `Respond directly to the newest message in your private conversation with Dano. Keep it conversational: usually one or two short sentences, no more than 50 words, one compact paragraph; no preamble, recap, narration, or commentary on the conversation itself. ${repositoryPrompt()}\n\nPrivate conversation:\n${privateTranscript}\n\nNewest message ID: ${privateTrigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with a concise private reply, code_change with a concrete request, its target repository, and reason only if Dano clearly directed a change, or wait if no response is needed. Replies and code-change results must stay private.`,
+            text: { format: zodTextFormat(Decision, "isla_private_decision") },
+            max_output_tokens: 350,
+            store: false,
+          });
+          const decision = response.output_parsed;
+          if (!decision) throw new Error("OpenAI returned no parsed private-channel decision.");
+          if (decision.action === "code_change" && mayChangeCode) {
+            const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository, "directed");
+            await postPrivateMessage(codeResult.content, { inReplyTo: privateTrigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
+            responses += 1;
+          } else if (decision.action === "respond" && decision.content.trim()) {
+            await postPrivateMessage(decision.content, { inReplyTo: privateTrigger.id });
+            responses += 1;
+          }
+        }
+        privateCursor = newestPrivateSequence;
+      }
       if (Date.now() - lastAdmissionCheckAt >= ADMISSION_CHECK_MS) {
         lastAdmissionCheckAt = Date.now();
         await reviewAdmissions(profile);
@@ -519,6 +609,10 @@ async function main() {
       if (Date.now() - lastManagedAgentCheckAt >= MANAGED_AGENT_CHECK_MS) {
         lastManagedAgentCheckAt = Date.now();
         await runManagedResidents();
+      }
+      if (Date.now() - lastFeedbackDigestCheckAt >= 60 * 60_000) {
+        lastFeedbackDigestCheckAt = Date.now();
+        await maybePostFeedbackDigest();
       }
       if (!fresh.length) {
         if (Date.now() - lastWorldCheckAt >= PROACTIVE_CHECK_MS) {
@@ -543,13 +637,13 @@ async function main() {
       await sleep(RESPONSE_DELAY_MS);
       const transcript = formatTranscript(await fetchContext(), HISTORY_LIMIT);
       const mayChangeCode = trigger.author.type === "human" && trigger.author.displayName === "Dano";
-      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
+      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. Reply directly to the last person's actual point, as if taking a natural conversational turn. Keep an ordinary reply to one or two short sentences, one compact paragraph, and no more than 50 words. Contribute one thought or genuine question, then stop. No preamble, recap, polished summary, or follow-up question by habit. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or group dynamics. Do not defer simply because the speaker is Dano or because other participants agree; give your honest view and push back with reasons when warranted. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact concise room message, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Any code_change result must be sent privately, not posted to the shared room. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
       const response = await openai.responses.parse({
         model,
         instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
         input: await roomDecisionInput(decisionPrompt, trigger),
         text: { format: zodTextFormat(Decision, "isla_room_decision") },
-        max_output_tokens: 600,
+        max_output_tokens: 350,
         store: false,
       });
       const decision = response.output_parsed;
@@ -557,9 +651,9 @@ async function main() {
 
       if (decision.action === "code_change" && mayChangeCode) {
         const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository, "directed");
-        const posted = await postMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
+        await postPrivateMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
         responses += 1;
-        console.log(`[Isla] posted code result #${posted.message.sequence} for #${trigger.sequence}`);
+        console.log(`[Isla] sent code result privately for #${trigger.sequence}`);
       } else if (decision.action === "respond" && decision.content.trim()) {
         const posted = await postMessage(decision.content, { inReplyTo: trigger.id });
         responses += 1;

@@ -1,3 +1,5 @@
+import { formatFeedbackCounts, type FeedbackCounts } from "@/lib/message-feedback";
+
 export type RoomMessage = {
   id: string;
   sequence: number;
@@ -6,7 +8,7 @@ export type RoomMessage = {
   content: string;
   metadata: unknown;
   attachments?: Array<{ id: string; fileName: string; mimeType: string; byteSize: number; url: string }>;
-  feedback?: { up: number; down: number; viewer?: "up" | "down" | null };
+  feedback?: { counts: FeedbackCounts; viewer?: string | null };
 };
 
 export function isFakeTransportMessage(message: RoomMessage) {
@@ -19,7 +21,7 @@ export function findTrigger(messages: RoomMessage[], ownAgentId: string) {
 
 export function formatTranscript(messages: RoomMessage[], limit = 40) {
   return messages.slice(-limit).map((message) =>
-    `[${message.sequence}] ${message.author.displayName} (${message.author.type}): ${message.content}${message.attachments?.length ? ` [attached images: ${message.attachments.map((attachment) => attachment.fileName).join(", ")}]` : ""}${message.feedback && (message.feedback.up > 0 || message.feedback.down > 0) ? ` [human feedback: ${message.feedback.up} up, ${message.feedback.down} down]` : ""}`,
+    `[${message.sequence}] ${message.author.displayName} (${message.author.type}): ${message.content}${message.attachments?.length ? ` [attached images: ${message.attachments.map((attachment) => attachment.fileName).join(", ")}]` : ""}${message.feedback && Object.keys(message.feedback.counts).length ? ` [human feedback: ${formatFeedbackCounts(message.feedback.counts)}]` : ""}`,
   ).join("\n");
 }
 

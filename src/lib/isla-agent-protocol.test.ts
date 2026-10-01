@@ -38,6 +38,6 @@ describe("Isla agent protocol", () => {
   });
 
   it("includes human feedback as behavioral context", () => {
-    expect(formatTranscript([message({ feedback: { up: 2, down: 1 } })], 1)).toContain("[human feedback: 2 up, 1 down]");
+    expect(formatTranscript([message({ feedback: { counts: { helpful: 2, missed_point: 1 } } })], 1)).toContain("[human feedback: 2 helpful, 1 missed the point]");
   });
 });

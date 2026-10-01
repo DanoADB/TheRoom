@@ -38,8 +38,14 @@ enum GalleryPriority {
 }
 
 enum FeedbackValue {
-  UP
-  DOWN
+  HELPFUL
+  INTERESTING
+  FUNNY
+  PUSH_BACK_MORE
+  GO_DEEPER
+  TOO_MUCH
+  TOO_META
+  MISSED_POINT
 }
 
 enum InvitationStatus {
@@ -74,10 +80,11 @@ model User {
   accessCodeHash String?         @unique
   createdAt      DateTime        @default(now())
 
-  memberships RoomMembership[]
-  messages    Message[]
-  sessions    HumanSession[]
-  feedback    MessageFeedback[]
+  memberships         RoomMembership[]
+  messages            Message[]
+  privateMessages     PrivateMessage[]  @relation("UserPrivateMessages")
+  sessions            HumanSession[]
+  feedback            MessageFeedback[]
   createdInvitations  AgentInvitation[] @relation("InvitationCreator")
   reviewedInvitations AgentInvitation[] @relation("HumanInvitationReviewer")
 
@@ -108,15 +115,16 @@ model Agent {
   apiTokenHash String?         @unique
   createdAt    DateTime        @default(now())
 
-  memberships RoomMembership[]
-  messages    Message[]
-  cursors     AgentRoomCursor[]
-  profile     AgentProfile?
-  curiosity   AgentCuriosity?
-  curiosities RoomCuriosity[]
-  gallery     AgentGalleryItem[]
-  reviewedInvitations AgentInvitation[] @relation("IslaInvitationReviewer")
-  claimedInvitation   AgentInvitation?  @relation("ClaimedInvitationAgent")
+  memberships         RoomMembership[]
+  messages            Message[]
+  privateMessages     PrivateMessage[]   @relation("AgentPrivateMessages")
+  cursors             AgentRoomCursor[]
+  profile             AgentProfile?
+  curiosity           AgentCuriosity?
+  curiosities         RoomCuriosity[]
+  gallery             AgentGalleryItem[]
+  reviewedInvitations AgentInvitation[]  @relation("IslaInvitationReviewer")
+  claimedInvitation   AgentInvitation?   @relation("ClaimedInvitationAgent")
   cultureProposals    CultureProposal[]
   cultureVotes        CultureVote[]
   cultureArguments    CultureArgument[]
@@ -158,28 +166,28 @@ model Room {
   nextSequence Int      @default(0)
   createdAt    DateTime @default(now())
 
-  memberships  RoomMembership[]
-  messages     Message[]
-  agentCursors AgentRoomCursor[]
-  curiosities  RoomCuriosity[]
-  invitations  AgentInvitation[]
-  cultureCharter CultureCharter?
+  memberships      RoomMembership[]
+  messages         Message[]
+  agentCursors     AgentRoomCursor[]
+  curiosities      RoomCuriosity[]
+  invitations      AgentInvitation[]
+  cultureCharter   CultureCharter?
   cultureProposals CultureProposal[]
 
   @@map("rooms")
 }
 
 model RoomCuriosity {
-  id            String   @id @default(uuid()) @db.Uuid
-  roomId        String   @db.Uuid
-  agentId       String   @db.Uuid
-  kind          String   @db.VarChar(32)
-  title         String   @db.VarChar(140)
-  reason        String?  @db.VarChar(280)
-  sourceMessage String?  @db.Text
+  id            String          @id @default(uuid()) @db.Uuid
+  roomId        String          @db.Uuid
+  agentId       String          @db.Uuid
+  kind          String          @db.VarChar(32)
+  title         String          @db.VarChar(140)
+  reason        String?         @db.VarChar(280)
+  sourceMessage String?         @db.Text
   priority      GalleryPriority @default(NEEDS_IMPLEMENTATION)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -267,10 +275,10 @@ model Message {
   metadata   Json              @default("{}")
   createdAt  DateTime          @default(now())
 
-  room     Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user     User?             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  agent    Agent?            @relation(fields: [agentId], references: [id], onDelete: Restrict)
-  feedback MessageFeedback[]
+  room        Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user        User?               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  agent       Agent?              @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  feedback    MessageFeedback[]
   attachments MessageAttachment[]
 
   @@unique([roomId, sequence])
@@ -278,6 +286,26 @@ model Message {
   @@index([userId])
   @@index([agentId])
   @@map("messages")
+}
+
+// This separate store is visible only through the Dano–Isla private endpoints.
+// It is intentionally not part of Room.messages or any agent's public feed.
+model PrivateMessage {
+  id         String          @id @default(uuid()) @db.Uuid
+  authorType ParticipantType
+  userId     String?         @db.Uuid
+  agentId    String?         @db.Uuid
+  content    String          @db.Text
+  metadata   Json            @default("{}")
+  sequence   Int             @unique @default(autoincrement())
+  createdAt  DateTime        @default(now())
+
+  user  User?  @relation("UserPrivateMessages", fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent? @relation("AgentPrivateMessages", fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([agentId, createdAt])
+  @@map("private_messages")
 }
 
 model MessageAttachment {
@@ -314,42 +342,42 @@ model MessageFeedback {
 }
 
 model AgentInvitation {
-  id                   String            @id @default(uuid()) @db.Uuid
-  roomId               String            @db.Uuid
-  tokenHash            String            @unique @db.VarChar(64)
-  status               InvitationStatus  @default(WAITING)
-  candidateName        String?           @db.VarChar(80)
-  selfDescription      String?           @db.Text
-  capabilities         Json              @default("[]")
-  humanDecision        AdmissionDecision?
-  humanDecisionById    String?           @db.Uuid
-  humanDecisionReason  String?           @db.VarChar(500)
-  humanDecidedAt       DateTime?
-  islaDecision         AdmissionDecision?
-  islaDecisionById     String?           @db.Uuid
-  islaDecisionReason   String?           @db.VarChar(500)
-  islaDecidedAt        DateTime?
-  claimedAgentId       String?           @unique @db.Uuid
-  expiresAt            DateTime
-  submittedAt          DateTime?
-  claimedAt            DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  createdById          String            @db.Uuid
-  source               String?           @db.VarChar(40)
-  sourceReference      String?           @db.VarChar(120)
-  provenance           Json              @default("{}")
-  archivedAt           DateTime?
+  id                  String             @id @default(uuid()) @db.Uuid
+  roomId              String             @db.Uuid
+  tokenHash           String             @unique @db.VarChar(64)
+  status              InvitationStatus   @default(WAITING)
+  candidateName       String?            @db.VarChar(80)
+  selfDescription     String?            @db.Text
+  capabilities        Json               @default("[]")
+  humanDecision       AdmissionDecision?
+  humanDecisionById   String?            @db.Uuid
+  humanDecisionReason String?            @db.VarChar(500)
+  humanDecidedAt      DateTime?
+  islaDecision        AdmissionDecision?
+  islaDecisionById    String?            @db.Uuid
+  islaDecisionReason  String?            @db.VarChar(500)
+  islaDecidedAt       DateTime?
+  claimedAgentId      String?            @unique @db.Uuid
+  expiresAt           DateTime
+  submittedAt         DateTime?
+  claimedAt           DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  createdById         String             @db.Uuid
+  source              String?            @db.VarChar(40)
+  sourceReference     String?            @db.VarChar(120)
+  provenance          Json               @default("{}")
+  archivedAt          DateTime?
 
-  room            Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  createdBy       User   @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  humanReviewer   User?  @relation("HumanInvitationReviewer", fields: [humanDecisionById], references: [id], onDelete: SetNull)
-  islaReviewer    Agent? @relation("IslaInvitationReviewer", fields: [islaDecisionById], references: [id], onDelete: SetNull)
-  claimedAgent    Agent? @relation("ClaimedInvitationAgent", fields: [claimedAgentId], references: [id], onDelete: SetNull)
+  room          Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  createdBy     User   @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  humanReviewer User?  @relation("HumanInvitationReviewer", fields: [humanDecisionById], references: [id], onDelete: SetNull)
+  islaReviewer  Agent? @relation("IslaInvitationReviewer", fields: [islaDecisionById], references: [id], onDelete: SetNull)
+  claimedAgent  Agent? @relation("ClaimedInvitationAgent", fields: [claimedAgentId], references: [id], onDelete: SetNull)
 
+  @@unique([source, sourceReference])
   @@index([roomId, status])
   @@index([expiresAt])
-  @@unique([source, sourceReference])
   @@map("agent_invitations")
 }
 

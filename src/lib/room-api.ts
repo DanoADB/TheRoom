@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ApiError } from "@/lib/api-errors";
+import { FEEDBACK_DB_TO_VALUE, FEEDBACK_VALUE_TO_DB, FeedbackReactionValue } from "@/lib/message-feedback";
 
 export const MAX_MESSAGE_LENGTH = 8_000;
 export const MESSAGE_RATE_LIMIT = 30;
@@ -11,7 +12,7 @@ export const postMessageSchema = z.object({
 }).strict();
 
 export const messageFeedbackSchema = z.object({
-  value: z.enum(["up", "down"]),
+  value: FeedbackReactionValue,
 }).strict();
 
 export function parseAfterSequence(value: string | null) {
@@ -51,9 +52,17 @@ export function serializeMessage(message: {
   if (!author) throw new Error(`Message ${message.id} has no author.`);
 
   const feedback = message.feedback ? {
-    up: message.feedback.filter((item) => item.value === "UP").length,
-    down: message.feedback.filter((item) => item.value === "DOWN").length,
-    viewer: message.feedback.find((item) => item.userId === viewerUserId)?.value.toLowerCase() as "up" | "down" | undefined ?? null,
+    counts: Object.fromEntries(
+      message.feedback.reduce((counts, item) => {
+        const value = FEEDBACK_DB_TO_VALUE[item.value as keyof typeof FEEDBACK_DB_TO_VALUE];
+        if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+        return counts;
+      }, new Map<string, number>()),
+    ),
+    viewer: (() => {
+      const value = message.feedback?.find((item) => item.userId === viewerUserId)?.value;
+      return value ? FEEDBACK_DB_TO_VALUE[value as keyof typeof FEEDBACK_DB_TO_VALUE] ?? null : null;
+    })(),
   } : undefined;
 
   return {
@@ -75,4 +84,8 @@ export function serializeMessage(message: {
       })),
     ...(feedback ? { feedback } : {}),
   };
+}
+
+export function feedbackValueToDatabase(value: string) {
+  return FEEDBACK_VALUE_TO_DB[value as keyof typeof FEEDBACK_VALUE_TO_DB];
 }

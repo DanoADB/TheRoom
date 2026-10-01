@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
-import { MVP_ROOM_ID } from "@/lib/room-constants";
+import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { serializeMessage } from "@/lib/room-api";
 import { buildRoomGallery } from "@/lib/room-gallery";
 import { AgentInterestList } from "@/lib/agent-curiosity";
@@ -99,6 +99,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
     <RoomView
       room={{ id: room.id, name: room.name }}
       currentUser={{ id: user.id, displayName: user.displayName }}
+      canOpenPrivate={user.id === DANO_USER_ID}
       participants={participants}
       curiosities={curiosities}
       initialMessages={room.messages.reverse().map((message) => serializeMessage(message, user.id))}
