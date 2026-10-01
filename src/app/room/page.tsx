@@ -27,13 +27,14 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
               status: true,
               gallery: {
                 where: { steerAway: false },
-                orderBy: { createdAt: "desc" },
+                orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
                 select: {
                   id: true,
                   kind: true,
                   title: true,
                   provenance: true,
                   imageUrl: true,
+                  priority: true,
                   createdAt: true,
                 },
               },
@@ -52,7 +53,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
         },
       },
       curiosities: {
-        orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+        orderBy: [{ priority: "asc" }, { kind: "asc" }, { createdAt: "desc" }],
         include: {
           agent: { select: { id: true, displayName: true } },
         },

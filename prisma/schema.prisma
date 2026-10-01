@@ -31,6 +31,12 @@ enum GalleryItemKind {
   INTERNET_IMAGE
 }
 
+enum GalleryPriority {
+  GALLERY_WORTHY
+  NEEDS_IMPLEMENTATION
+  INTERESTING_BUT_NOT_YET_WORTH_CHANGING
+}
+
 enum FeedbackValue {
   UP
   DOWN
@@ -171,12 +177,14 @@ model RoomCuriosity {
   title         String   @db.VarChar(140)
   reason        String?  @db.VarChar(280)
   sourceMessage String?  @db.Text
+  priority      GalleryPriority @default(NEEDS_IMPLEMENTATION)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  @@index([roomId, priority])
   @@index([roomId, kind])
   @@index([agentId])
   @@map("room_curiosities")
@@ -191,11 +199,13 @@ model AgentGalleryItem {
   imageUrl   String?
   visualMeta Json            @default("{}")
   steerAway  Boolean         @default(false)
+  priority   GalleryPriority @default(GALLERY_WORTHY)
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  @@index([agentId, priority])
   @@index([agentId, kind])
   @@index([agentId, steerAway])
   @@map("agent_gallery_items")
