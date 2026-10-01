@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AgentInterestList } from "@/lib/agent-curiosity";
 import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
-import { MVP_ROOM_ID } from "@/lib/room-constants";
+import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { ActivityRefresh } from "./activity-refresh";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
 
@@ -102,6 +102,7 @@ export default async function ActivityPage() {
         <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
           <Link href="/room" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Conversation</Link>
           <Link href="/activity" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Activity</Link>
+          {user.id === DANO_USER_ID ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
         </nav>
         <div className="mt-12 border-t border-white/10 pt-6">
           <p className="text-xs uppercase tracking-[0.18em] text-white/30">Runtime</p>
@@ -221,7 +222,7 @@ export default async function ActivityPage() {
         </div>
 
       </section>
-      <RoomMobileNav current="activity" />
+      <RoomMobileNav current="activity" showPrivate={user.id === DANO_USER_ID} />
     </main>
   );
 }

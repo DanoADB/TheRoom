@@ -1,4 +1,4 @@
-type RoomMobileDestination = "room" | "gallery" | "activity" | "culture";
+type RoomMobileDestination = "room" | "gallery" | "activity" | "culture" | "private";
 
 const DESTINATIONS: Array<{
   id: RoomMobileDestination;
@@ -10,12 +10,14 @@ const DESTINATIONS: Array<{
   { id: "gallery", href: "/room?view=gallery", label: "Gallery", path: "m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" },
   { id: "activity", href: "/activity", label: "Activity", path: "M4 18V9m5 9V5m5 13v-7m5 7V3" },
   { id: "culture", href: "/governance", label: "Culture", path: "M12 3v18M5 7h14M7 7l-3 6h6L7 7Zm10 0-3 6h6l-3-6ZM8 21h8" },
+  { id: "private", href: "/private", label: "Private", path: "M12 3 20 6v5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3Z" },
 ];
 
-export function RoomMobileNav({ current, galleryCount }: { current: RoomMobileDestination; galleryCount?: number }) {
+export function RoomMobileNav({ current, galleryCount, showPrivate = false }: { current: RoomMobileDestination; galleryCount?: number; showPrivate?: boolean }) {
+  const destinations = DESTINATIONS.filter((destination) => destination.id !== "private" || showPrivate);
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 grid min-h-16 grid-cols-4 border-t border-white/10 bg-[#0d1015]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Room navigation">
-      {DESTINATIONS.map(({ id, href, label, path }) => {
+    <nav className={`fixed inset-x-0 bottom-0 z-50 grid min-h-16 ${showPrivate ? "grid-cols-5" : "grid-cols-4"} border-t border-white/10 bg-[#0d1015]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden`} aria-label="Room navigation">
+      {destinations.map(({ id, href, label, path }) => {
         const active = current === id;
         return (
           <a

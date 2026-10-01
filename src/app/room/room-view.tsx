@@ -148,6 +148,7 @@ function getTurnBoundaryMessages(messages: RoomMessage[]) {
 export function RoomView({
   room,
   currentUser,
+  canOpenPrivate,
   participants,
   curiosities,
   initialMessages,
@@ -156,6 +157,7 @@ export function RoomView({
 }: {
   room: { id: string; name: string };
   currentUser: { id: string; displayName: string };
+  canOpenPrivate: boolean;
   participants: Participant[];
   curiosities: RoomGalleryBucket[];
   initialMessages: RoomMessage[];
@@ -365,6 +367,7 @@ export function RoomView({
           <Link href="/room" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Conversation</Link>
           <Link href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Activity</Link>
           <Link href="/governance" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Threshold & culture</Link>
+          {canOpenPrivate ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
         </nav>
         <div className="mt-12">
           <p className="text-xs uppercase tracking-[0.18em] text-white/30">Present</p>
@@ -622,7 +625,7 @@ export function RoomView({
         </footer>
 
       </section>
-      <RoomMobileNav current={mobileView === "gallery" ? "gallery" : "room"} galleryCount={curiosities.length} />
+      <RoomMobileNav current={mobileView === "gallery" ? "gallery" : "room"} galleryCount={curiosities.length} showPrivate={canOpenPrivate} />
     </main>
   );
 }
