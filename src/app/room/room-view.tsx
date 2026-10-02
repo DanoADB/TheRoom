@@ -374,6 +374,7 @@ export function RoomView({
           <Link href="/room" aria-current={mobileView === "room" ? "page" : undefined} className={`block border-l px-3 py-2 ${mobileView === "room" ? "border-emerald-300 text-emerald-200" : "border-transparent text-white/40 hover:text-white/75"}`}>Conversation</Link>
           <Link href="/room?view=gallery" aria-current={mobileView === "gallery" ? "page" : undefined} className={`block border-l px-3 py-2 ${mobileView === "gallery" ? "border-emerald-300 text-emerald-200" : "border-transparent text-white/40 hover:text-white/75"}`}>Gallery</Link>
           <Link href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Activity</Link>
+          <Link href="/study" className="block border-l border-transparent px-3 py-2 text-white/60 hover:text-white">Study</Link>
           <Link href="/governance" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Threshold & culture</Link>
           {canOpenPrivate ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with {privatePartner}</Link> : null}
         </nav>
@@ -385,7 +386,7 @@ export function RoomView({
                 <span className={`h-2 w-2 rounded-full ${participant.status === "active" || participant.type === "human" ? "bg-emerald-300" : "bg-white/20"}`} />
                 <div>
                   <p className="text-sm text-white/80">{participant.displayName}</p>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-white/30">{participant.type}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-white/50">{participant.status === "study" ? "In the Study" : participant.type}</p>
                 </div>
               </li>
             ))}

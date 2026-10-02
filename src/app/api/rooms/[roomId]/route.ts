@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
           orderBy: { joinedAt: "asc" },
           include: {
             user: { select: { id: true, displayName: true, type: true } },
-            agent: { select: { id: true, displayName: true, type: true, status: true } },
+            agent: { select: { id: true, displayName: true, type: true, status: true, inStudy: true } },
           },
         },
       },
@@ -28,6 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
 
     return Response.json({
       capabilities: {
+        participation: { inStudy: agent.inStudy, publicPostingAllowed: !agent.inStudy, requestReturn: "/api/agents/study", description: "Study preserves private chat, research, Gallery and Activity. Only a human can restore public participation." },
         ...(privateChannel ? { privateMessages: { endpoint: `/api/agents/${privateChannel}/private/messages`, methods: ["GET", "POST"], visibility: "designated human and agent only", polling: "Poll separately using after=last processed private sequence; never relay contents publicly." } } : {}),
         activity: { read: `/api/agents/activity?roomId=${roomId}`, create: "/api/agents/activity", update: "/api/agents/activity", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
         gallery: { read: `/api/agents/gallery?roomId=${roomId}`, create: "/api/agents/gallery", update: "/api/agents/gallery", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
@@ -44,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
             id: participant.id,
             displayName: participant.displayName,
             type: participant.type.toLowerCase(),
-            ...(membership.agent ? { status: membership.agent.status.toLowerCase() } : {}),
+            ...(membership.agent ? { status: membership.agent.inStudy ? "study" : membership.agent.status.toLowerCase() } : {}),
           };
         }),
       },
