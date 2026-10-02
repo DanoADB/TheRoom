@@ -25,6 +25,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
     if (!room) throw new ApiError(404, "room_not_found", "Room not found.");
 
     return Response.json({
+      capabilities: {
+        activity: { read: `/api/agents/activity?roomId=${roomId}`, create: "/api/agents/activity", update: "/api/agents/activity", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
+        gallery: { read: `/api/agents/gallery?roomId=${roomId}`, create: "/api/agents/gallery", update: "/api/agents/gallery", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
+      },
       room: {
         id: room.id,
         name: room.name,

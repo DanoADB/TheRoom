@@ -176,7 +176,7 @@ export function RoomView({
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<{ messageId: string; message: string } | null>(null);
-  const [mobileView] = useState<"room" | "gallery">(initialMobileView);
+  const mobileView = initialMobileView;
   const [paceMode, setPaceMode] = useState(true);
   const [feedPaused, setFeedPaused] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -368,7 +368,8 @@ export function RoomView({
           <p className="mt-2 text-[11px] text-white/25">A Hobbedy space</p>
         </div>
         <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
-          <Link href="/room" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Conversation</Link>
+          <Link href="/room" aria-current={mobileView === "room" ? "page" : undefined} className={`block border-l px-3 py-2 ${mobileView === "room" ? "border-emerald-300 text-emerald-200" : "border-transparent text-white/40 hover:text-white/75"}`}>Conversation</Link>
+          <Link href="/room?view=gallery" aria-current={mobileView === "gallery" ? "page" : undefined} className={`block border-l px-3 py-2 ${mobileView === "gallery" ? "border-emerald-300 text-emerald-200" : "border-transparent text-white/40 hover:text-white/75"}`}>Gallery</Link>
           <Link href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Activity</Link>
           <Link href="/governance" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Threshold & culture</Link>
           {canOpenPrivate ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
@@ -397,7 +398,7 @@ export function RoomView({
       <section className="flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] min-w-0 flex-col lg:h-screen">
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d1015]/90 px-5 backdrop-blur sm:px-8">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">{room.name}</h1>
+            <h1 className="text-lg font-semibold tracking-tight">{mobileView === "gallery" ? "Gallery of Curiosity" : room.name}</h1>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">One room · {latestSequence} messages</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
@@ -445,7 +446,7 @@ export function RoomView({
           </div>
         </header>
 
-        <div className={`${mobileView === "room" ? "block" : "hidden"} relative min-h-0 flex-1 lg:block`}>
+        <div className={`${mobileView === "room" ? "block" : "hidden"} relative min-h-0 flex-1`}>
           <div ref={scrollContainerRef} onScroll={handleTranscriptScroll} className="h-full overflow-y-auto px-5 py-8 sm:px-8">
             <div className="mx-auto max-w-3xl space-y-8">
             {messages.length === 0 ? (
@@ -578,11 +579,11 @@ export function RoomView({
           ) : null}
         </div>
 
-        <section className={`${mobileView === "gallery" ? "block" : "hidden"} flex-1 overflow-y-auto lg:hidden`} aria-label="Gallery priority">
+        <section className={`${mobileView === "gallery" ? "block" : "hidden"} min-h-0 flex-1 overflow-y-auto`} aria-label="Gallery of Curiosity">
           <GalleryBuckets buckets={curiosities} />
         </section>
 
-        <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6 lg:block`}>
+        <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6`}>
           <form onSubmit={send} className="mx-auto max-w-3xl">
             <div className="border border-white/10 bg-black/20 focus-within:border-white/25">
               {images.length ? (

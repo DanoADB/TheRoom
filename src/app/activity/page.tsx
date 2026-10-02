@@ -128,6 +128,7 @@ export default async function ActivityPage() {
         <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
           <Link href="/room" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Conversation</Link>
           <Link href="/activity" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Activity</Link>
+          <Link href="/room?view=gallery" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Gallery</Link>
           {user.id === DANO_USER_ID ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
         </nav>
         <div className="mt-12 border-t border-white/10 pt-6">
