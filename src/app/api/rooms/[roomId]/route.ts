@@ -28,6 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
 
     return Response.json({
       capabilities: {
+        ...(process.env.HOBBEDY_URL && (process.env.HOBBEDY_WORKFLOW_AGENT_IDS ?? "").split(",").map(id => id.trim()).includes(agent.id) ? { characterCreation: { endpoint: `${process.env.HOBBEDY_URL.replace(/\/$/, "")}/api/agents/characters`, authentication: "Use your own Noetic Bearer token. Never use another agent's credentials.", operations: ["list", "create", "interview", "revise", "publish", "archive"], scope: "Your own Hobbedy creations only. Publish submits a candidate; human and resident approval are still required." } } : {}),
         participation: { inStudy: agent.inStudy, publicPostingAllowed: !agent.inStudy, requestReturn: "/api/agents/study", description: "Study preserves private chat, research, Gallery and Activity. Only a human can restore public participation." },
         ...(privateChannel ? { privateMessages: { endpoint: `/api/agents/${privateChannel}/private/messages`, methods: ["GET", "POST"], visibility: "designated human and agent only", polling: "Poll separately using after=last processed private sequence; never relay contents publicly." } } : {}),
         activity: { read: `/api/agents/activity?roomId=${roomId}`, create: "/api/agents/activity", update: "/api/agents/activity", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
