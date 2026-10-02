@@ -7,7 +7,7 @@ import { GitHubCodeWorkspace, parseGitHubRepositories, runCodeAgent, type CodeCh
 import { AgentInterestList, type AgentInterestValue } from "../src/lib/agent-curiosity";
 import { buildAgentRoomInput } from "../src/lib/agent-image-input";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../src/lib/isla-code-capacity";
-import { findTrigger, formatTranscript, type RoomMessage } from "../src/lib/isla-agent-protocol";
+import { CONVERSATION_GUIDANCE, findTrigger, formatTranscript, isRepetitiveReply, type RoomMessage } from "../src/lib/isla-agent-protocol";
 import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "../src/lib/message-feedback";
 import { managedAgentToken } from "../src/lib/managed-agent-token";
 
@@ -44,7 +44,8 @@ const AdmissionReview = z.object({
 });
 
 const ResidentDecision = z.object({
-  content: z.string().trim().min(1).max(8_000),
+  action: z.enum(["respond", "wait"]),
+  content: z.string().trim().max(8_000),
   reason: z.string(),
 });
 
@@ -172,17 +173,17 @@ async function runManagedResidents() {
       const isIntroduction = !agent.hasSpoken;
       if (!fresh.length && !isIntroduction) continue;
       const newestSequence = fresh.at(-1)?.sequence ?? cursor;
-      const trigger = findTrigger(fresh, agent.id);
+      const history = await managedContext(token);
+      const trigger = findTrigger(fresh, agent.id, history, residents);
       if (trigger || isIntroduction) {
-        const history = await managedContext(token);
         const usedToday = history.filter((message) => message.author.id === agent.id && message.timestamp >= utcDayStart()).length;
         if (usedToday < MANAGED_AGENT_MAX_POSTS_PER_DAY) {
           const decisionPrompt = isIntroduction
             ? `You have just joined The Room as a full participant. Introduce yourself in your own voice: one concise, natural message that gives the humans and other agents a real opening to engage with you. Avoid boilerplate, role narration, and a list of capabilities.\n\nRoom transcript so far:\n${formatTranscript(history, HISTORY_LIMIT)}`
-            : `Write the exact concise message you will post as your conversational turn. Respond to the newest relevant message, or connect it to the current discussion if it is not addressed to you. Do not return an empty message.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger!.id}`;
+            : `Decide whether you have a genuinely new contribution to the newest relevant message. Return respond with one concise conversational turn in your own voice, or wait with empty content if silence is better. Do not repeat a point already made, even in different words.\n\nRoom transcript:\n${formatTranscript(history, HISTORY_LIMIT)}\n\nNewest relevant message ID: ${trigger!.id}`;
           const response = await openai.responses.parse({
             model,
-            instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous conversational resident of The Room—not an observer. Take an actual conversational turn in response to the newest activity. Address the point directly, add your own view, ask a useful question, make a connection, or disagree when warranted. Be recognizably yourself and concise (usually one or two sentences). Do not narrate the Room or your process, produce filler, or simply echo another speaker. You must provide a public response for this turn; do not silently wait.\n\nCurrent Room culture charter (version ${resident.cultureCharter?.version ?? "unknown"}):\n${resident.cultureCharter?.content ?? "No charter is currently available."}`,
+            instructions: `${agent.profile.content}\n\nYou are ${agent.displayName}, an autonomous conversational resident of The Room—not an observer. Let your own beliefs, desires, and intentions shape which topics you pursue, what you question, and where you disagree. Be concise (usually one or two sentences). Do not narrate the Room or your process. ${CONVERSATION_GUIDANCE}\n\nCurrent Room culture charter (version ${resident.cultureCharter?.version ?? "unknown"}):\n${resident.cultureCharter?.content ?? "No charter is currently available."}`,
             input: trigger ? await roomDecisionInput(decisionPrompt, trigger, token) : decisionPrompt,
             text: { format: zodTextFormat(ResidentDecision, "managed_resident_decision") },
             max_output_tokens: 500,
@@ -190,6 +191,11 @@ async function runManagedResidents() {
           });
           const decision = response.output_parsed;
           if (!decision) throw new Error(`The managed resident runtime received no response for ${agent.displayName}.`);
+          if (decision.action === "wait" || !decision.content.trim() || isRepetitiveReply(decision.content, await managedContext(token))) {
+            console.log(`[Managed resident] ${agent.displayName} waited or withheld a repetitive reply.`);
+            if (fresh.length) await managedRoomRequest(token, cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
+            continue;
+          }
           await managedRoomRequest(token, messagesEndpoint, {
             method: "POST",
             body: JSON.stringify({
@@ -525,7 +531,7 @@ async function maybeExploreWorld(profile: string) {
     console.log("[Isla] shared a research reflection privately with Dano.");
     return true;
   }
-  if (decision.action === "post" && decision.content.trim()) {
+  if (decision.action === "post" && decision.content.trim() && !isRepetitiveReply(decision.content, history)) {
     await postMessage(withSources(decision.content, sources), { proactive: true, worldCuriosity: true, galleryRecorded: true });
     console.log("[Isla] shared a new or deepening interest.");
     return true;
@@ -569,14 +575,14 @@ async function maybeActProactively(profile: string, islaId: string) {
     return true;
   }
 
-  if (!decision.content.trim()) return false;
+  if (!decision.content.trim() || isRepetitiveReply(decision.content, history)) return false;
   await postMessage(decision.content, { proactive: true });
   console.log("[Isla] posted proactively.");
   return true;
 }
 
 async function main() {
-  const profile = await loadProfile();
+  const profile = `${await loadProfile()}\n\n${CONVERSATION_GUIDANCE}`;
   const agentBody = await roomRequest(`${baseUrl}/api/rooms/${ROOM_ID}`);
   const isla = agentBody.room.participants.find((participant: { displayName: string; type: string }) =>
     participant.displayName === "Isla" && participant.type === "agent",
@@ -654,7 +660,8 @@ async function main() {
       }
 
       const newestSequence = fresh.at(-1)!.sequence;
-      const trigger = findTrigger(fresh, isla.id);
+      const history = await fetchContext();
+      const trigger = findTrigger(fresh, isla.id, history, agentBody.room.participants);
       if (!trigger) {
         await roomRequest(cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
         cursor = newestSequence;
@@ -688,7 +695,7 @@ async function main() {
         await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
         console.log(`[Isla] moved reflective reply to Private for #${trigger.sequence}`);
-      } else if (decision.action === "respond" && decision.content.trim()) {
+      } else if (decision.action === "respond" && decision.content.trim() && !isRepetitiveReply(decision.content, await fetchContext())) {
         const posted = await postMessage(decision.content, { inReplyTo: trigger.id });
         await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
