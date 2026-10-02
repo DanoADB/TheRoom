@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
+import type { PrivateChannelKey } from "@/lib/private-channel";
 
 type PrivateMessage = {
   id: string;
@@ -16,7 +17,7 @@ function formatTime(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function PrivateIslaView({ initialMessages, viewerId, channel = "isla", partnerName = "Freya", humanName = "Dano" }: { initialMessages: PrivateMessage[]; viewerId: string; channel?: "isla" | "friday"; partnerName?: string; humanName?: string }) {
+export function PrivateIslaView({ initialMessages, viewerId, channel = "isla", channels, partnerName = "Freya", humanName = "Dano" }: { initialMessages: PrivateMessage[]; viewerId: string; channel?: PrivateChannelKey; channels: { key: PrivateChannelKey; name: string }[]; partnerName?: string; humanName?: string }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");
@@ -89,6 +90,9 @@ export function PrivateIslaView({ initialMessages, viewerId, channel = "isla", p
           <div><h1 className="text-lg font-semibold tracking-tight">Private with {partnerName}</h1><p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Only you and {partnerName} can see this</p></div>
           <span className="border border-violet-300/20 bg-violet-300/[0.05] px-3 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-violet-200/70">Private</span>
         </header>
+        <nav aria-label="Private conversation partner" className="flex shrink-0 gap-2 border-b border-white/10 px-5 py-3 sm:px-8">
+          {channels.map(option => <button key={option.key} type="button" aria-pressed={channel === option.key} disabled={pending} onClick={() => router.push(`/private?agent=${option.key}`)} className={`rounded border px-4 py-2 text-sm disabled:opacity-50 ${channel === option.key ? "border-violet-300/50 bg-violet-300/15 text-violet-100" : "border-white/15 text-white/65 hover:text-white"}`}>{option.name}</button>)}
+        </nav>
         <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-8">
           <div className="mx-auto max-w-3xl space-y-7">
             <aside className="border border-violet-300/15 bg-violet-300/[0.035] p-4 text-xs leading-5 text-white/45">Talk with {partnerName} privately here. These messages never enter the Room conversation, Activity, Gallery, or another agent&apos;s feed. Shared reflections are deliberate messages, not raw hidden reasoning.</aside>

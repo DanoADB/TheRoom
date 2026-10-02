@@ -3,19 +3,23 @@ import { APRIL_USER_ID, DANO_USER_ID, FRIDAY_AGENT_ID, ISLA_AGENT_ID } from "@/l
 
 export const PRIVATE_CHANNELS = {
   isla: { humanId: DANO_USER_ID, humanName: "Dano", agentId: ISLA_AGENT_ID, agentName: "Freya" },
+  "isla-session": { humanId: DANO_USER_ID, humanName: "Dano", agentId: "5c6a994f-00ab-4bc8-bbc8-5d33603939b4", agentName: "Isla" },
   friday: { humanId: APRIL_USER_ID, humanName: "April", agentId: FRIDAY_AGENT_ID, agentName: "Friday" },
 } as const;
 export type PrivateChannelKey = keyof typeof PRIVATE_CHANNELS;
+export function privateChannelsForHuman(userId: string): PrivateChannelKey[] {
+  return (Object.keys(PRIVATE_CHANNELS) as PrivateChannelKey[]).filter(key => PRIVATE_CHANNELS[key].humanId === userId);
+}
 export function privateChannelForHuman(userId: string): PrivateChannelKey | null {
   return userId === DANO_USER_ID ? "isla" : userId === APRIL_USER_ID ? "friday" : null;
 }
 export function privateChannelForAgent(agentId: string): PrivateChannelKey | null {
-  return agentId === ISLA_AGENT_ID ? "isla" : agentId === FRIDAY_AGENT_ID ? "friday" : null;
+  return (Object.keys(PRIVATE_CHANNELS) as PrivateChannelKey[]).find(key => PRIVATE_CHANNELS[key].agentId === agentId) ?? null;
 }
-// Each participant has exactly one private partner. Scope reads and sequence aggregates by that pair.
+// The explicit channel keeps the same human's messages to different agents isolated.
 export function privateMessageScope(channel: PrivateChannelKey) {
   const pair = PRIVATE_CHANNELS[channel];
-  return { OR: [{ authorType: "HUMAN" as const, userId: pair.humanId, agentId: null }, { authorType: "AGENT" as const, agentId: pair.agentId, userId: null }] };
+  return { channel, OR: [{ authorType: "HUMAN" as const, userId: pair.humanId, agentId: null }, { authorType: "AGENT" as const, agentId: pair.agentId, userId: null }] };
 }
 
 export function requirePrivateHuman(userId: string, channel: PrivateChannelKey = "isla") {
