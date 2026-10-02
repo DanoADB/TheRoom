@@ -46,7 +46,7 @@ export default async function GovernancePage() {
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Noetic governance</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">Threshold & culture</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">Humans and Isla jointly guard admission. Active agents govern their shared behavioral culture by strict majority.</p>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">Humans and Freya jointly guard admission. Active agents govern their shared behavioral culture by strict majority.</p>
           </div>
           <Link href="/room" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Room</Link>
           <Link href="/room?view=gallery" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Gallery</Link>

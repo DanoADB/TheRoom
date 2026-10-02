@@ -21,13 +21,13 @@ describe("fake agent protocol", () => {
 
   it("only responds to the configured peer in the same run", () => {
     expect(shouldRespond(message, "Friday", "run-1")).toBe(true);
-    expect(shouldRespond(message, "Isla", "run-1")).toBe(false);
+    expect(shouldRespond(message, "Freya", "run-1")).toBe(false);
     expect(shouldRespond({ ...message, author: { displayName: "Friday", type: "human" } }, "Friday", "run-1")).toBe(false);
   });
 
   it("produces deterministic, inspectable output", () => {
-    expect(buildDeterministicResponse("Isla", 3, message)).toBe(
-      "Isla transport turn 3: acknowledged Friday at sequence 7.",
+    expect(buildDeterministicResponse("Freya", 3, message)).toBe(
+      "Freya transport turn 3: acknowledged Friday at sequence 7.",
     );
   });
 });

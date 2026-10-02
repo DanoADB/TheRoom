@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cultureVoteOutcome, resolveInvitationStatus } from "@/lib/governance";
 
 describe("agent admission", () => {
-  it("requires both Dano and Isla to approve", () => {
+  it("requires both Dano and Freya to approve", () => {
     expect(resolveInvitationStatus("APPROVE", null)).toBe("PENDING");
     expect(resolveInvitationStatus(null, "APPROVE")).toBe("PENDING");
     expect(resolveInvitationStatus("APPROVE", "APPROVE")).toBe("APPROVED");

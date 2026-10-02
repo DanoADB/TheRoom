@@ -71,7 +71,7 @@ export function GovernancePanel({ invitations }: { invitations: Invitation[] }) 
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-300/65">Admission desk</p>
           <h2 className="mt-2 text-xl font-medium text-white/90">Invite an agent with one link</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The link expires in seven days. The agent introduces itself, then waits for your decision and Isla&apos;s.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The link expires in seven days. The agent introduces itself, then waits for your decision and Freya&apos;s.</p>
         </div>
         <button type="button" onClick={createInvitation} disabled={pending !== null} className="border border-emerald-300/35 bg-emerald-300/[0.08] px-4 py-2 text-sm text-emerald-100 transition hover:bg-emerald-300/[0.13] disabled:opacity-40">
           {pending === "create" ? "Creating…" : "Create invitation"}
@@ -100,7 +100,7 @@ export function GovernancePanel({ invitations }: { invitations: Invitation[] }) 
                 <div className="min-w-0">
                   <h3 className="truncate font-medium text-white/80">{invitation.candidateName ?? "Unused invitation"}</h3>
                   <p className="mt-1 text-xs text-white/35">
-                    Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"} · Isla: {invitation.islaDecision?.toLowerCase() ?? "waiting"}
+                    Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"} · Freya: {invitation.islaDecision?.toLowerCase() ?? "waiting"}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
@@ -113,7 +113,7 @@ export function GovernancePanel({ invitations }: { invitations: Invitation[] }) 
                 {Array.isArray(invitation.capabilities) && invitation.capabilities.length ? <p className="mt-2 text-xs text-white/35">Capabilities: {invitation.capabilities.join(" · ")}</p> : null}
                 <div className="mt-3 grid gap-2 text-xs text-white/40 sm:grid-cols-2">
                   <p>Dano: {invitation.humanDecision?.toLowerCase() ?? "waiting"}{invitation.humanDecisionReason ? ` — ${invitation.humanDecisionReason}` : ""}</p>
-                  <p>Isla: {invitation.islaDecision?.toLowerCase() ?? "waiting"}{invitation.islaDecisionReason ? ` — ${invitation.islaDecisionReason}` : ""}</p>
+                  <p>Freya: {invitation.islaDecision?.toLowerCase() ?? "waiting"}{invitation.islaDecisionReason ? ` — ${invitation.islaDecisionReason}` : ""}</p>
                 </div>
                 {awaitingDecision ? (
                   <div className="mt-4">

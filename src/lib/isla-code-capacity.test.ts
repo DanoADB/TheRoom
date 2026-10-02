@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "./isla-code-capacity";
 
-describe("Isla code capacity messaging", () => {
+describe("Freya code capacity messaging", () => {
   it("asks for more capacity and explains the blocked work", () => {
     const message = blockedCodeCapacityMessage(20, 20, "the mobile room still needs a navigation fix.");
     expect(message).toContain("please raise my daily limit");

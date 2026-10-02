@@ -168,7 +168,7 @@ export function RoomView({
 }) {
   const router = useRouter();
   const privateChannel = privateChannelForHuman(currentUser.id);
-  const privatePartner = privateChannel ? PRIVATE_CHANNELS[privateChannel].agentName : "Isla";
+  const privatePartner = privateChannel ? PRIVATE_CHANNELS[privateChannel].agentName : "Freya";
   const [messages, setMessages] = useState(initialMessages);
   const [latestSequence, setLatestSequence] = useState(initialSequence);
   const [content, setContent] = useState("");
@@ -434,11 +434,11 @@ export function RoomView({
               href={OPENAI_USAGE_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open the OpenAI usage dashboard for TheRoom and Isla costs"
-              title="OpenAI Usage — filter to theRoom/Isla"
+              aria-label="Open the OpenAI usage dashboard for TheRoom and Freya costs"
+              title="OpenAI Usage — filter to theRoom/Freya"
               className="border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 transition hover:border-emerald-300/30 hover:text-emerald-200"
             >
-              <span className="hidden sm:inline">Isla API cost </span>
+              <span className="hidden sm:inline">Freya API cost </span>
               <span className="sm:hidden">Cost </span>
               <span aria-hidden="true">↗</span>
             </a>

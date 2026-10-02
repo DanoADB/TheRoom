@@ -10,7 +10,7 @@ const decisionSchema = admissionDecisionSchema.extend({ invitationId: z.uuid() }
 
 async function requireIsla(request: Request) {
   const agent = await authenticateAgent(request);
-  if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Isla performs the agent-side admission review.");
+  if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Freya performs the agent-side admission review.");
   await requireAgentRoomMembership(agent.id, MVP_ROOM_ID);
   return agent;
 }

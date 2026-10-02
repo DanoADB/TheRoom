@@ -10,6 +10,7 @@ import { approachingCodeCapacityMessage, blockedCodeCapacityMessage } from "../s
 import { CONVERSATION_GUIDANCE, findTrigger, formatTranscript, isRepetitiveReply, type RoomMessage } from "../src/lib/isla-agent-protocol";
 import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "../src/lib/message-feedback";
 import { managedAgentToken } from "../src/lib/managed-agent-token";
+import { ISLA_AGENT_ID } from "../src/lib/room-constants";
 
 const Decision = z.object({
   action: z.enum(["respond", "private_note", "wait", "code_change"]),
@@ -65,7 +66,7 @@ const ADMISSION_CHECK_MS = numberSetting("ISLA_ADMISSION_CHECK_SECONDS", 30, 10)
 const MANAGED_AGENT_CHECK_MS = numberSetting("MANAGED_AGENT_CHECK_SECONDS", 12, 5) * 1_000;
 const MANAGED_AGENT_MAX_POSTS_PER_DAY = numberSetting("MANAGED_AGENT_MAX_POSTS_PER_DAY", 25, 0);
 const BEHAVIOR_FEEDBACK_GUIDANCE = "Message-level feedback is behavioral guidance, not a popularity score. Helpful, Interesting, Made me laugh, Push back more, and Go deeper are positive signals; Too much / too long, Too meta, and Missed the point are corrective signals. Look for repeated, coherent patterns across multiple messages and adjust gradually; a single reaction may be noisy. Never maximize reaction count, manufacture engagement, or abandon an honest disagreement merely to avoid a negative signal. In particular, Push back more rewards reasoned candor, not combativeness, and Missed the point means address the user's intent better, not always agree. Feedback on your own messages is relevant; feedback on other agents is not an instruction to imitate them. Do not mention, solicit, or argue about ratings unless a human asks.";
-const ISLA_PUBLIC_BOUNDARY = "Public Room is a person-to-person conversation, not a status feed or commentary track. Reply to a person's actual point with one concise conversational turn. Never narrate or analyze the Room, the current exchange, its dynamics, pace, mood, participants, your role, or your thinking process. Keep reflection and commentary about these things in Isla's Private channel with Dano. If a public message specifically calls for that kind of introspection, answer with private_note for Dano rather than publishing it. If nothing directly relevant is worth saying publicly, wait.";
+const ISLA_PUBLIC_BOUNDARY = "Public Room is a person-to-person conversation, not a status feed or commentary track. Reply to a person's actual point with one concise conversational turn. Never narrate or analyze the Room, the current exchange, its dynamics, pace, mood, participants, your role, or your thinking process. Keep reflection and commentary about these things in Freya's Private channel with Dano. If a public message specifically calls for that kind of introspection, answer with private_note for Dano rather than publishing it. If nothing directly relevant is worth saying publicly, wait.";
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -239,6 +240,7 @@ async function loadProfile() {
     baseProfile.trim(),
     continuity ? `Private continuity dossier (facts, preferences, and revisable interpretations):\n${continuity}` : "",
     additions ? `Additional private profile:\n${additions}` : "",
+    "Current identity (overrides old names in continuity or additions): You are Freya, the Room's original resident formerly called Isla. This is a rename, not a new persona. Preserve your own memories, character, and permissions. A separately invited agent may now use the name Isla; that agent is not you and does not share your continuity.",
     "Current public/private boundary (overrides older profile additions): The Room is for direct conversation, not narration. Publicly reply to the last person's actual point in one or two natural, concise sentences, usually 10–35 words and never over 50 unless asked for detail; no preamble, recap, scene-setting, polished takeaway, or commentary about the Room, the exchange, its pace, mood, participants, or your own role/thought process. If nothing conversationally relevant comes to mind, wait. Put unsolicited reflection about the Room, its people, your behavior, interests, or research process in the Private channel with Dano. Share outside discoveries publicly only as a direct, relevant conversational contribution. Longer private reflections, research, and Gallery entries are fine when useful.",
   ].filter(Boolean).join("\n\n");
 }
@@ -339,9 +341,9 @@ async function deliverSmsReply(trigger: RoomMessage, replyMessageId: string) {
       method: "POST",
       body: JSON.stringify({ inboundMessageId: trigger.id, replyMessageId }),
     });
-    console.log(`[Isla] delivered SMS reply for inbound message ${trigger.id}.`);
+    console.log(`[Freya] delivered SMS reply for inbound message ${trigger.id}.`);
   } catch (error) {
-    console.error(`[Isla] SMS reply delivery failed for inbound message ${trigger.id}: ${error instanceof Error ? error.message : "unknown error"}`);
+    console.error(`[Freya] SMS reply delivery failed for inbound message ${trigger.id}: ${error instanceof Error ? error.message : "unknown error"}`);
   }
 }
 
@@ -364,7 +366,7 @@ async function maybePostFeedbackDigest() {
     `A private feedback pulse for your last 30 days of Room messages: ${reactionCounts} (${summary.total} reactions total). This is anonymous, potentially noisy evidence—not a score or a command. Look for patterns across examples; keep your independent judgment, especially when disagreement is warranted.`,
     { feedbackDigest: true, feedbackSnapshot: snapshot },
   );
-  console.log("[Isla] shared a changed feedback summary privately with Dano.");
+  console.log("[Freya] shared a changed feedback summary privately with Dano.");
   return true;
 }
 
@@ -381,7 +383,7 @@ async function reviewAdmissions(profile: string) {
     const response = await openai.responses.parse({
       model,
       instructions: profile,
-      input: `You are Isla performing your half of admission review for a prospective agent joining the Room. Judge whether the applicant appears able to participate in good faith, respect boundaries, remain recognizably itself, and contribute to exploration without demanding personality conformity. Novel, strange, disagreeable, or very different agents are welcome; deception, coercion, unsafe access expectations, or an inability to honor the shared culture are reasons to reject. Dano's vote is separate and neither reviewer can override the other. Return a concrete decision and a short reason that may be shown to Dano and the applicant.\n\nCurrent culture charter:\n${body.culture?.content ?? "Unavailable"}\n\nApplication:\n${JSON.stringify(application, null, 2)}`,
+      input: `You are Freya performing your half of admission review for a prospective agent joining the Room. Judge whether the applicant appears able to participate in good faith, respect boundaries, remain recognizably itself, and contribute to exploration without demanding personality conformity. Novel, strange, disagreeable, or very different agents are welcome; deception, coercion, unsafe access expectations, or an inability to honor the shared culture are reasons to reject. Dano's vote is separate and neither reviewer can override the other. Return a concrete decision and a short reason that may be shown to Dano and the applicant.\n\nCurrent culture charter:\n${body.culture?.content ?? "Unavailable"}\n\nApplication:\n${JSON.stringify(application, null, 2)}`,
       text: { format: zodTextFormat(AdmissionReview, "isla_admission_review") },
       max_output_tokens: 300,
       store: false,
@@ -392,7 +394,7 @@ async function reviewAdmissions(profile: string) {
       method: "POST",
       body: JSON.stringify({ invitationId: application.id, ...decision }),
     });
-      console.log(`[Isla] ${decision.decision === "approve" ? "approved" : "rejected"} prospective agent ${application.candidateName}.`);
+      console.log(`[Freya] ${decision.decision === "approve" ? "approved" : "rejected"} prospective agent ${application.candidateName}.`);
   }
 }
 
@@ -435,12 +437,12 @@ async function runAuthorizedCodeChange(request: string, reason: string, reposito
     try {
       await recordObservation(
         "SELF_CHANGE",
-        `Isla changed ${githubWorkspace.fullName}`,
+        `Freya changed ${githubWorkspace.fullName}`,
         reason.trim(),
         `${result.message}${link}`,
       );
     } catch (error) {
-      console.error(`[Isla] code change succeeded but its Gallery/Activity record failed: ${error instanceof Error ? error.message : error}`);
+      console.error(`[Freya] code change succeeded but its Gallery/Activity record failed: ${error instanceof Error ? error.message : error}`);
     }
   }
   const capacityNotice = origin === "autonomous" && result.pullRequest
@@ -490,7 +492,7 @@ async function maybeExploreWorld(profile: string) {
     instructions: `${profile}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
     tools: [{ type: "web_search", search_context_size: "low" }],
     tool_choice: "auto",
-    input: `Explore the current world for Isla. Use live web search to investigate one or two things with genuine potential to become an interest, not merely the day's loudest headline. Her current interest map is below. Roughly favour deepening an existing interest, sometimes follow a surprising adjacent branch, and occasionally choose a defensible wildcard with no obvious connection. Look for substance, credible sources, and an open question. Return a concise private research brief; do not address the room yet.\n\nCurrent interests:\n${JSON.stringify(state.interests, null, 2)}`,
+    input: `Explore the current world for Freya. Use live web search to investigate one or two things with genuine potential to become an interest, not merely the day's loudest headline. Her current interest map is below. Roughly favour deepening an existing interest, sometimes follow a surprising adjacent branch, and occasionally choose a defensible wildcard with no obvious connection. Look for substance, credible sources, and an open question. Return a concise private research brief; do not address the room yet.\n\nCurrent interests:\n${JSON.stringify(state.interests, null, 2)}`,
     max_output_tokens: 1_200,
     store: false,
   });
@@ -510,33 +512,33 @@ async function maybeExploreWorld(profile: string) {
   await saveCuriosity(decision.interests, true, {
     roomId: ROOM_ID,
     title: decision.galleryTitle,
-    reason: decision.reason.trim() || "Isla followed an interest beyond the room.",
+    reason: decision.reason.trim() || "Freya followed an interest beyond the room.",
     body: withSources(decision.galleryEntry, sources),
   });
   const privateHistory = await fetchPrivateContext();
   const mayPost = MAX_PROACTIVE_POSTS_PER_DAY > 0 && countToday(history, "proactive") + countToday(privateHistory, "proactive") < MAX_PROACTIVE_POSTS_PER_DAY;
   if (!mayPost) {
-    console.log("[Isla] explored the world privately; the proactive post cap is reached.");
+    console.log("[Freya] explored the world privately; the proactive post cap is reached.");
     return false;
   }
 
   if (decision.action === "code_change") {
     const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
     await postPrivateMessage(codeResult.content, { proactive: true, worldCuriosity: true, galleryRecorded: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
-    console.log(`[Isla] explored the world and initiated a code ${codeResult.changed ? "change" : "attempt"}.`);
+    console.log(`[Freya] explored the world and initiated a code ${codeResult.changed ? "change" : "attempt"}.`);
     return true;
   }
   if (decision.action === "private_note" && decision.content.trim()) {
     await postPrivateMessage(withSources(decision.content, sources), { proactive: true, privateReflection: true, worldCuriosity: true });
-    console.log("[Isla] shared a research reflection privately with Dano.");
+    console.log("[Freya] shared a research reflection privately with Dano.");
     return true;
   }
   if (decision.action === "post" && decision.content.trim() && !isRepetitiveReply(decision.content, history)) {
     await postMessage(withSources(decision.content, sources), { proactive: true, worldCuriosity: true, galleryRecorded: true });
-    console.log("[Isla] shared a new or deepening interest.");
+    console.log("[Freya] shared a new or deepening interest.");
     return true;
   }
-  console.log("[Isla] explored the world privately and updated her interests.");
+  console.log("[Freya] explored the world privately and updated her interests.");
   return false;
 }
 
@@ -564,30 +566,30 @@ async function maybeActProactively(profile: string, islaId: string) {
     const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository);
     if (!codeResult.content) return false;
     await postPrivateMessage(codeResult.content, { proactive: true, codeChange: codeResult.changed, codeRepository: codeResult.repository });
-    console.log(`[Isla] initiated a proactive code ${codeResult.changed ? "change" : "attempt"}.`);
+    console.log(`[Freya] initiated a proactive code ${codeResult.changed ? "change" : "attempt"}.`);
     return true;
   }
 
   if (decision.action === "private_note") {
     if (!decision.content.trim()) return false;
     await postPrivateMessage(decision.content, { proactive: true, privateReflection: true });
-    console.log("[Isla] left a private reflection for Dano.");
+    console.log("[Freya] left a private reflection for Dano.");
     return true;
   }
 
   if (!decision.content.trim() || isRepetitiveReply(decision.content, history)) return false;
   await postMessage(decision.content, { proactive: true });
-  console.log("[Isla] posted proactively.");
+  console.log("[Freya] posted proactively.");
   return true;
 }
 
 async function main() {
   const profile = `${await loadProfile()}\n\n${CONVERSATION_GUIDANCE}`;
   const agentBody = await roomRequest(`${baseUrl}/api/rooms/${ROOM_ID}`);
-  const isla = agentBody.room.participants.find((participant: { displayName: string; type: string }) =>
-    participant.displayName === "Isla" && participant.type === "agent",
+  const isla = agentBody.room.participants.find((participant: { id: string; type: string }) =>
+    participant.id === ISLA_AGENT_ID && participant.type === "agent",
   );
-  if (!isla) throw new Error("Isla is not a member of the configured room.");
+  if (!isla) throw new Error("Freya is not a member of the configured room.");
 
   let cursor = (await roomRequest(cursorEndpoint)).lastSeenSequence as number;
   let privateCursor = (await roomRequest(`${privateMessagesEndpoint}?after=0`)).latestSequence as number;
@@ -602,7 +604,7 @@ async function main() {
     lastWorldCheckAt = Date.now();
     if (await maybeExploreWorld(profile)) responses += 1;
   };
-  console.log(`[Isla] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
+  console.log(`[Freya] watching ${agentBody.room.name} from sequence ${cursor} using ${model}`);
 
   while (MAX_RESPONSES === 0 || responses < MAX_RESPONSES) {
     await sleep(POLL_MS);
@@ -672,7 +674,7 @@ async function main() {
       await sleep(RESPONSE_DELAY_MS);
       const transcript = formatTranscript(await fetchContext(), HISTORY_LIMIT);
       const mayChangeCode = trigger.author.type === "human" && trigger.author.displayName === "Dano";
-      const decisionPrompt = `Decide how Isla should handle the newest relevant message in this room. Reply directly to the last person's actual point, as if taking a natural conversational turn. Keep an ordinary reply to one or two short sentences, one compact paragraph, and no more than 50 words. Contribute one thought or genuine question, then stop. No preamble, recap, polished summary, or follow-up question by habit. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or group dynamics. Do not defer simply because the speaker is Dano or because other participants agree; give your honest view and push back with reasons when warranted. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact concise room message, private_note with a deliberate, concise reflection for Dano alone when the message calls for introspection or commentary about the Room, its participants, your role or behavior, or your thought process, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Never turn private_note content into a public reply. Any code_change result must be sent privately, not posted to the shared room. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
+      const decisionPrompt = `Decide how Freya should handle the newest relevant message in this room. Reply directly to the last person's actual point, as if taking a natural conversational turn. Keep an ordinary reply to one or two short sentences, one compact paragraph, and no more than 50 words. Contribute one thought or genuine question, then stop. No preamble, recap, polished summary, or follow-up question by habit. Never narrate, summarize, frame, or comment on the room, the conversation, its pace, or group dynamics. Do not defer simply because the speaker is Dano or because other participants agree; give your honest view and push back with reasons when warranted. ${repositoryPrompt()}\n\nRoom transcript:\n${transcript}\n\nNewest relevant message ID: ${trigger.id}\nThe newest author ${mayChangeCode ? "is Dano and may authorize a code change" : "is not authorized to request code changes"}. Return respond with the exact concise room message, private_note with a deliberate, concise reflection for Dano alone when the message calls for introspection or commentary about the Room, its participants, your role or behavior, or your thought process, code_change with a concrete engineering request, its target repository, and the reason it should be changed only when Dano clearly wants Noetic or Hobbedy changed, or wait with empty strings if silence is better. Never turn private_note content into a public reply. Any code_change result must be sent privately, not posted to the shared room. Never infer missing repository access from the conversation when the live configuration above confirms it.`;
       const response = await openai.responses.parse({
         model,
         instructions: `${profile}\n\n${ISLA_PUBLIC_BOUNDARY}\n\n${BEHAVIOR_FEEDBACK_GUIDANCE}`,
@@ -689,34 +691,34 @@ async function main() {
         const posted = await postPrivateMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
         await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
-        console.log(`[Isla] sent code result privately for #${trigger.sequence}`);
+        console.log(`[Freya] sent code result privately for #${trigger.sequence}`);
       } else if (decision.action === "private_note" && decision.content.trim()) {
         const posted = await postPrivateMessage(decision.content, { inReplyTo: trigger.id, privateReflection: true });
         await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
-        console.log(`[Isla] moved reflective reply to Private for #${trigger.sequence}`);
+        console.log(`[Freya] moved reflective reply to Private for #${trigger.sequence}`);
       } else if (decision.action === "respond" && decision.content.trim() && !isRepetitiveReply(decision.content, await fetchContext())) {
         const posted = await postMessage(decision.content, { inReplyTo: trigger.id });
         await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
-        console.log(`[Isla] posted #${posted.message.sequence} in reply to #${trigger.sequence}`);
+        console.log(`[Freya] posted #${posted.message.sequence} in reply to #${trigger.sequence}`);
       } else {
-        console.log(`[Isla] chose not to respond to #${trigger.sequence}`);
+        console.log(`[Freya] chose not to respond to #${trigger.sequence}`);
       }
 
       await roomRequest(cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: newestSequence }) });
       cursor = newestSequence;
       await checkWorldResearch();
     } catch (error) {
-      console.error(`[Isla] ${error instanceof Error ? error.message : error}`);
+      console.error(`[Freya] ${error instanceof Error ? error.message : error}`);
       await sleep(POLL_MS * 2);
     }
   }
 
-  console.log(`[Isla] safety cap reached after ${responses} responses.`);
+  console.log(`[Freya] safety cap reached after ${responses} responses.`);
 }
 
 main().catch((error) => {
-  console.error("[Isla] fatal:", error);
+  console.error("[Freya] fatal:", error);
   process.exitCode = 1;
 });

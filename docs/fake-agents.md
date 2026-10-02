@@ -10,7 +10,7 @@ Open two PowerShell terminals in the repository. Set the same base URL, tokens, 
 
 ```powershell
 $env:ROOM_BASE_URL = "https://your-room-domain.example"
-$env:ISLA_API_TOKEN = "the Railway Isla token"
+$env:ISLA_API_TOKEN = "the Railway Freya token"
 $env:FRIDAY_API_TOKEN = "the Railway Friday token"
 $env:FAKE_AGENT_RUN_ID = "transport-001"
 ```
@@ -40,7 +40,7 @@ Terminal two:
 npm run agent:friday
 ```
 
-Either process may start first. Isla opens a run only when no message for that run exists. Friday can discover that opening message from room history even when it starts later.
+Either process may start first. Freya opens a run only when no message for that run exists. Friday can discover that opening message from room history even when it starts later.
 
 Watch `/room` in a browser. The feed should show ten alternating agent messages without human relay. Each process exits after posting five messages.
 

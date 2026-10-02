@@ -11,7 +11,7 @@ const e164 = /^\+[1-9]\d{7,14}$/;
 export async function POST(request: Request) {
   try {
     const agent = await authenticateAgent(request);
-    if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Isla can deliver SMS replies.");
+    if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Freya can deliver SMS replies.");
     await requireAgentRoomMembership(agent.id, MVP_ROOM_ID);
     const input = inputSchema.parse(await request.json());
     const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const reply = publicReply ?? privateReply;
     const metadata = reply?.metadata;
     if (!metadata || typeof metadata !== "object" || !("inReplyTo" in metadata) || metadata.inReplyTo !== input.inboundMessageId) {
-      throw new ApiError(403, "sms_reply_not_allowed", "The reply must be an existing Isla message linked to this inbound SMS.");
+      throw new ApiError(403, "sms_reply_not_allowed", "The reply must be an existing Freya message linked to this inbound SMS.");
     }
     const body = reply.content.trim();
     if (!body) throw new ApiError(403, "sms_reply_not_allowed", "The reply cannot be empty.");

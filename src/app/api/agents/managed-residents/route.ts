@@ -7,7 +7,7 @@ import { ISLA_AGENT_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 export async function GET(request: Request) {
   try {
     const isla = await authenticateAgent(request);
-    if (isla.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Isla can read the managed resident roster.");
+    if (isla.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_required", "Only Freya can read the managed resident roster.");
     await requireAgentRoomMembership(isla.id, MVP_ROOM_ID);
 
     const approved = await prisma.agentInvitation.findMany({

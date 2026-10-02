@@ -9,7 +9,7 @@ const ROOM_ID = "700a0000-0000-4000-8000-000000000001";
 export async function GET(request: Request) {
   try {
     const agent = await authenticateAgent(request);
-    if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_only", "This feedback summary is available only to Isla.");
+    if (agent.id !== ISLA_AGENT_ID) throw new ApiError(403, "isla_only", "This feedback summary is available only to Freya.");
     await requireAgentRoomMembership(agent.id, ROOM_ID);
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000);

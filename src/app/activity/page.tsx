@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AgentInterestList } from "@/lib/agent-curiosity";
 import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
-import { MVP_ROOM_ID } from "@/lib/room-constants";
+import { ISLA_AGENT_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 import { ActivityRefresh } from "./activity-refresh";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
@@ -56,7 +56,7 @@ export default async function ActivityPage() {
   if (!membership) redirect("/login");
 
   const isla = await prisma.agent.findFirst({
-    where: { displayName: "Isla" },
+    where: { id: ISLA_AGENT_ID },
     include: { curiosity: true },
   });
 
@@ -97,7 +97,7 @@ export default async function ActivityPage() {
     return {
       id: `message:${message.id}`,
       kind: metadata.worldCuriosity === true ? "Research" : metadata.codeChange === true ? "Build" : "Proactive",
-      title: "Isla",
+      title: "Freya",
       content: message.content,
       createdAt: message.createdAt,
     };
@@ -138,7 +138,7 @@ export default async function ActivityPage() {
           <div className="mt-4 flex items-center gap-3">
             <span className={`h-2 w-2 rounded-full ${agentActive ? "bg-emerald-300" : "bg-white/20"}`} />
             <div>
-              <p className="text-sm text-white/80">Isla</p>
+              <p className="text-sm text-white/80">Freya</p>
               <p className="font-mono text-[10px] uppercase tracking-wider text-white/30">{agentActive ? "Active" : "Inactive"}</p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default async function ActivityPage() {
           </div>
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
             <span className={`h-2 w-2 rounded-full ${agentActive ? "bg-emerald-300" : "bg-white/20"}`} />
-            Isla {agentActive ? "active" : "inactive"}
+            Freya {agentActive ? "active" : "inactive"}
           </div>
         </header>
 
@@ -175,7 +175,7 @@ export default async function ActivityPage() {
                     <h3 className="font-medium text-white/85">World research</h3>
                     <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-300/65">Scheduled</span>
                   </div>
-                  <p className="mt-3 min-h-12 text-sm leading-6 text-white/45">Explores the world and grows Isla&apos;s interests during quiet periods.</p>
+                  <p className="mt-3 min-h-12 text-sm leading-6 text-white/45">Explores the world and grows Freya&apos;s interests during quiet periods.</p>
                   <div className="mt-5"><ProgressBar value={researchCount} max={maxResearch} label="Researches today" /></div>
                   <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">Next window · {formatTime(nextResearchAt)}</p>
                 </article>
@@ -187,7 +187,7 @@ export default async function ActivityPage() {
                   </div>
                   <p className="mt-3 min-h-12 text-sm leading-6 text-white/45">Looks for worthwhile moments to start a conversation or improve the room.</p>
                   <div className="mt-5"><ProgressBar value={proactiveCount} max={maxProactive} label="Proactive posts today" /></div>
-                  <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">Checked on Isla&apos;s heartbeat</p>
+                  <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">Checked on Freya&apos;s heartbeat</p>
                 </article>
 
                 <article className="border border-white/10 bg-white/[0.03] p-5">

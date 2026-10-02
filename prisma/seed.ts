@@ -38,7 +38,7 @@ async function main() {
     prisma.user.upsert({ where: { id: ids.dano }, update: { displayName: "Dano", ...(danoAccessCode ? { accessCodeHash: tokenHash(danoAccessCode) } : {}) }, create: { id: ids.dano, displayName: "Dano", accessCodeHash: danoAccessCode ? tokenHash(danoAccessCode) : null } }),
     prisma.user.upsert({ where: { id: ids.april }, update: { displayName: "April", ...(aprilAccessCode ? { accessCodeHash: tokenHash(aprilAccessCode) } : {}) }, create: { id: ids.april, displayName: "April", accessCodeHash: aprilAccessCode ? tokenHash(aprilAccessCode) : null } }),
     prisma.user.upsert({ where: { id: ids.anu }, update: { displayName: "Anu", ...(anuAccessCode ? { accessCodeHash: tokenHash(anuAccessCode) } : {}) }, create: { id: ids.anu, displayName: "Anu", accessCodeHash: anuAccessCode ? tokenHash(anuAccessCode) : null } }),
-    prisma.agent.upsert({ where: { id: ids.isla }, update: { displayName: "Isla", apiTokenHash: tokenHash(islaToken) }, create: { id: ids.isla, displayName: "Isla", apiTokenHash: tokenHash(islaToken) } }),
+    prisma.agent.upsert({ where: { id: ids.isla }, update: { displayName: "Freya", apiTokenHash: tokenHash(islaToken) }, create: { id: ids.isla, displayName: "Freya", apiTokenHash: tokenHash(islaToken) } }),
     prisma.agent.upsert({ where: { id: ids.friday }, update: { displayName: "Friday", apiTokenHash: tokenHash(fridayToken) }, create: { id: ids.friday, displayName: "Friday", apiTokenHash: tokenHash(fridayToken) } }),
     prisma.room.upsert({ where: { id: ids.room }, update: { name: "The Room" }, create: { id: ids.room, name: "The Room" } }),
   ]);
@@ -56,8 +56,8 @@ async function main() {
 
   await prisma.agentCuriosity.upsert({
     where: { agentId: isla.id },
-    update: { interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
-    create: { agentId: isla.id, interests: [{ topic: "gallery curation", why: "It helps Isla keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
+    update: { interests: [{ topic: "gallery curation", why: "It helps Freya keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
+    create: { agentId: isla.id, interests: [{ topic: "gallery curation", why: "It helps Freya keep the room visually legible without overbuilding taxonomy.", nextQuestion: "What makes a gallery item feel relevant at a glance?", origin: "adjacent", strength: 4 }] },
   });
 
   await prisma.cultureCharter.upsert({
@@ -74,7 +74,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log(`Seeded ${room.name} with Dano, April, Anu, Isla, and Friday.`);
+  console.log(`Seeded ${room.name} with Dano, April, Anu, Freya, and Friday.`);
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await prisma.$disconnect(); });

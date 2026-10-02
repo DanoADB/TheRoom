@@ -26,8 +26,8 @@ function parseAgentKey(): AgentKey {
 
 const agentKey = parseAgentKey();
 const config = agentKey === "isla"
-  ? { name: "Isla", peerName: "Friday", token: required("ISLA_API_TOKEN"), initiates: true }
-  : { name: "Friday", peerName: "Isla", token: required("FRIDAY_API_TOKEN"), initiates: false };
+  ? { name: "Freya", peerName: "Friday", token: required("ISLA_API_TOKEN"), initiates: true }
+  : { name: "Friday", peerName: "Freya", token: required("FRIDAY_API_TOKEN"), initiates: false };
 const baseUrl = required("ROOM_BASE_URL").replace(/\/$/, "");
 const runId = required("FAKE_AGENT_RUN_ID");
 const endpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;

@@ -27,7 +27,7 @@ describe("private channel endpoint isolation", () => {
       expect(mocks.aggregate).toHaveBeenLastCalledWith({ where: privateMessageScope("friday"), _max: { sequence: true } });
     }
   });
-  it("keeps existing Dano and Isla history scoped to their pair", async () => {
+  it("keeps existing Dano and Freya history scoped to their pair", async () => {
     mocks.human.mockResolvedValue({ id: DANO_USER_ID }); mocks.agent.mockResolvedValue({ id: ISLA_AGENT_ID });
     for (const read of [humanIsla, agentIsla]) {
       expect((await read(get())).status).toBe(200);

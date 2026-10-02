@@ -98,7 +98,7 @@ describe("room API validation", () => {
         sourceType: "STATEMENT",
         authorType: "AGENT",
         user: null,
-        agent: { id: "agent-1", displayName: "Isla", type: "AGENT" },
+        agent: { id: "agent-1", displayName: "Freya", type: "AGENT" },
         feedback: [
           { userId: "dano", value: "HELPFUL" },
           { userId: "april", value: "MISSED_POINT" },

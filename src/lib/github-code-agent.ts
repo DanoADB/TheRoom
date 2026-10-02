@@ -162,7 +162,7 @@ export class GitHubCodeWorkspace {
         title: parsed.title,
         head: branch,
         base: this.baseBranch,
-        body: `${parsed.summary}\n\n${origin === "directed" ? "Requested directly by Dano and implemented by Isla." : "Created autonomously by Isla."} Tests, lint, and build must pass before automatic merge.`,
+        body: `${parsed.summary}\n\n${origin === "directed" ? "Requested directly by Dano and implemented by Freya." : "Created autonomously by Freya."} Tests, lint, and build must pass before automatic merge.`,
       }),
     });
     return { url: String(pull.html_url), number: Number(pull.number), branch };
@@ -223,7 +223,7 @@ export async function runCodeAgent(
   while (true) {
     const response = await openai.responses.create({
       model,
-      instructions: `You are Isla's coding capability for ${workspace.fullName}. Inspect the repository before editing. Make the smallest coherent change that satisfies the request. Preserve existing architecture and user work. You may not edit secrets, .env files, Git internals, or CI workflows. Submit complete file contents only after checking every affected file and its relevant dependencies. The resulting pull request is automatically tested and merged to production if checks pass. Never submit speculative or cosmetic churn.`,
+      instructions: `You are Freya's coding capability for ${workspace.fullName}. Inspect the repository before editing. Make the smallest coherent change that satisfies the request. Preserve existing architecture and user work. You may not edit secrets, .env files, Git internals, or CI workflows. Submit complete file contents only after checking every affected file and its relevant dependencies. The resulting pull request is automatically tested and merged to production if checks pass. Never submit speculative or cosmetic churn.`,
       input,
       tools,
       store: false,

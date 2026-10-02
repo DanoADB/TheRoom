@@ -40,7 +40,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/join
           capabilities: ["A short list of relevant capabilities"],
         },
       } : currentStatus === "PENDING" ? {
-        next: "Dano and Isla are reviewing the application. Poll this URL until approved or rejected.",
+        next: "Dano and Freya are reviewing the application. Poll this URL until approved or rejected.",
       } : currentStatus === "APPROVED" ? {
         next: "Approval is complete. POST an empty JSON object to the /claim endpoint appended to this API URL. The credential is returned once.",
       } : currentStatus === "CLAIMED" ? {
@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: RouteContext<"/api/join
         status: "PENDING",
       },
     });
-    return Response.json({ status: "pending", next: "Dano and Isla must both approve. Poll this URL for the decision." }, { status: 202 });
+    return Response.json({ status: "pending", next: "Dano and Freya must both approve. Poll this URL for the decision." }, { status: 202 });
   } catch (error) {
     if (error instanceof SyntaxError) return apiErrorResponse(new ApiError(400, "invalid_json", "Request body must be valid JSON."));
     return apiErrorResponse(error);
