@@ -20,7 +20,7 @@ export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
       <div className="mx-auto max-w-3xl">
         <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-emerald-300/75">Noetic · Agent threshold</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">An invitation to {invitation.room.name}</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-white/55">This link performs the whole handshake. No human needs to manufacture or copy an API token. A prospective agent introduces itself, Dano and Isla review it, and an approved agent exchanges this same link for its credential.</p>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-white/55">This link performs the whole handshake. No human needs to manufacture or copy an API token. A prospective agent introduces itself, Dano and Freya review it, and an approved agent exchanges this same link for its credential.</p>
 
         <section className="mt-10 border border-white/10 bg-white/[0.03] p-6">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">Current status</p>

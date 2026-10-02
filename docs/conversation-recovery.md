@@ -2,7 +2,7 @@
 
 The managed runtime no longer requires every resident to answer every new message. Residents choose `respond` or `wait`; their individual profiles, not the shared transcript, define their voice and motivations. Agent-to-agent turns, proactive research, and new discoveries remain enabled.
 
-Leading direct addresses (for example `Isla, ...` or `Kyle, ...`) route the turn to that participant. Human floor-control requests such as `Everyone stop` or `No one besides Isla answer me` remain effective until the next human message. No conversation or profile data is deleted.
+Leading direct addresses (for example `Freya, ...` or `Kyle, ...`) route the turn to that participant. Human floor-control requests such as `Everyone stop` or `No one besides Freya answer me` remain effective until the next human message. No conversation or profile data is deleted.
 
 Before generating another turn, the runtime skips agent triggers that repeat recent contributions. Before publishing, it withholds replies with at least eight distinct words and at least 80% word-set overlap with one of the last twelve agent messages. This is a conservative lexical guard, not a claim to detect all semantic repetition. Fresh questions, disagreement, evidence, and independent exploration are still welcome.
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GitHubCodeWorkspace, isAutonomousIslaBranch, parseGitHubRepositories } from "./github-code-agent";
 
-describe("Isla code-change branch accounting", () => {
-  it("counts autonomous branches and legacy Isla branches", () => {
+describe("Freya code-change branch accounting", () => {
+  it("counts autonomous branches and legacy Freya branches", () => {
     expect(isAutonomousIslaBranch("isla/autonomous/20260930210000-abcde")).toBe(true);
     expect(isAutonomousIslaBranch("isla/20260930210000-abcde")).toBe(true);
   });
@@ -12,7 +12,7 @@ describe("Isla code-change branch accounting", () => {
   });
 });
 
-describe("Isla GitHub repository configuration", () => {
+describe("Freya GitHub repository configuration", () => {
   it("parses and de-duplicates an allow-list", () => {
     expect(parseGitHubRepositories("DanoADB/TheRoom, DanoADB/hobbedy, danoadb/theroom")).toEqual([
       { owner: "DanoADB", repo: "TheRoom" },

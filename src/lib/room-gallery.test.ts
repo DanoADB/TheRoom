@@ -12,7 +12,7 @@ describe("room gallery", () => {
       priority: "GALLERY_WORTHY",
       createdAt: new Date("2026-09-30T20:00:00.000Z"),
       agentId: "agent-isla",
-      author: "Isla",
+      author: "Freya",
     }]);
 
     expect(gallery).toEqual([{
@@ -27,7 +27,7 @@ describe("room gallery", () => {
         sourceMessage: null,
         timestamp: "2026-09-30T20:00:00.000Z",
         agentId: "agent-isla",
-        author: "Isla",
+        author: "Freya",
         priority: "gallery-worthy",
       }],
     }, {
@@ -52,17 +52,17 @@ describe("room gallery", () => {
       sourceMessage: null,
       priority: "NEEDS_IMPLEMENTATION",
       createdAt: new Date("2026-09-30T19:00:00.000Z"),
-      agent: { id: "agent-isla", displayName: "Isla" },
+      agent: { id: "agent-isla", displayName: "Freya" },
     }], [{
       id: "gallery-1",
       kind: "INTERNET_IMAGE",
       title: "Newer object",
-      provenance: "Collected by Isla.",
+      provenance: "Collected by Freya.",
       imageUrl: "https://example.com/object.jpg",
       priority: "GALLERY_WORTHY",
       createdAt: new Date("2026-09-30T20:00:00.000Z"),
       agentId: "agent-isla",
-      author: "Isla",
+      author: "Freya",
     }]);
 
     expect(gallery[0].items.map((item) => item.id)).toEqual(["gallery-1"]);

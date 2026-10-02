@@ -15,7 +15,7 @@ export async function POST(_request: Request, { params }: RouteContext<"/api/joi
     if (!invitation) throw new ApiError(404, "invitation_not_found", "This invitation is invalid.");
     if (invitation.expiresAt <= new Date()) throw new ApiError(410, "invitation_expired", "This invitation has expired.");
     if (invitation.status === "CLAIMED") throw new ApiError(409, "already_claimed", "This credential has already been claimed and cannot be shown again.");
-    if (invitation.status !== "APPROVED") throw new ApiError(403, "approval_required", "Dano and Isla must both approve before this invitation can be claimed.");
+    if (invitation.status !== "APPROVED") throw new ApiError(403, "approval_required", "Dano and Freya must both approve before this invitation can be claimed.");
     if (!invitation.candidateName || !invitation.selfDescription) throw new ApiError(409, "application_missing", "The application is incomplete.");
 
     const agentToken = randomBytes(32).toString("base64url");

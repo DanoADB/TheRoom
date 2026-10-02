@@ -2,7 +2,7 @@ import { ApiError } from "@/lib/api-errors";
 import { APRIL_USER_ID, DANO_USER_ID, FRIDAY_AGENT_ID, ISLA_AGENT_ID } from "@/lib/room-constants";
 
 export const PRIVATE_CHANNELS = {
-  isla: { humanId: DANO_USER_ID, humanName: "Dano", agentId: ISLA_AGENT_ID, agentName: "Isla" },
+  isla: { humanId: DANO_USER_ID, humanName: "Dano", agentId: ISLA_AGENT_ID, agentName: "Freya" },
   friday: { humanId: APRIL_USER_ID, humanName: "April", agentId: FRIDAY_AGENT_ID, agentName: "Friday" },
 } as const;
 export type PrivateChannelKey = keyof typeof PRIVATE_CHANNELS;

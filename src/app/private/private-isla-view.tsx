@@ -16,7 +16,7 @@ function formatTime(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function PrivateIslaView({ initialMessages, viewerId, channel = "isla", partnerName = "Isla", humanName = "Dano" }: { initialMessages: PrivateMessage[]; viewerId: string; channel?: "isla" | "friday"; partnerName?: string; humanName?: string }) {
+export function PrivateIslaView({ initialMessages, viewerId, channel = "isla", partnerName = "Freya", humanName = "Dano" }: { initialMessages: PrivateMessage[]; viewerId: string; channel?: "isla" | "friday"; partnerName?: string; humanName?: string }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");

@@ -13,7 +13,7 @@ describe("desktop Gallery navigation", () => {
     expect(html).toContain("Private with Friday");
     expect(html).toContain('placeholder="Message Friday privately…"');
     expect(html).toContain("Visible only to April and Friday");
-    expect(html).not.toContain("Private with Isla");
+    expect(html).not.toContain("Private with Freya");
   });
   it("exposes Gallery on desktop and does not force the transcript visible in gallery view", () => {
     const html = renderToStaticMarkup(React.createElement(RoomView, {

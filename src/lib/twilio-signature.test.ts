@@ -3,7 +3,7 @@ import { twilioRequestSignature, verifyTwilioRequest } from "@/lib/twilio-signat
 
 describe("Twilio webhook signature verification", () => {
   const url = "https://noetic.hobbedy.com/api/integrations/twilio/sms";
-  const parameters = { From: "+15551234567", Body: "Hello Isla", MessageSid: "SM123" };
+  const parameters = { From: "+15551234567", Body: "Hello Freya", MessageSid: "SM123" };
   const token = "test-auth-token";
 
   it("signs the exact public URL and alphabetically ordered form parameters", () => {
