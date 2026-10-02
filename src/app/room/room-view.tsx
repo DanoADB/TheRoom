@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
 import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "@/lib/message-feedback";
+import { galleryExplorationRequest } from "@/lib/gallery-exploration";
 
 type RoomMessage = {
   id: string;
@@ -53,32 +54,46 @@ function formatTimestamp(timestamp: string) {
   return new Date(timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function GalleryEntry({ item }: { item: RoomGalleryItem }) {
+export function GalleryEntry({ item, roomId, viewerId }: { item: RoomGalleryItem; roomId: string; viewerId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const hasMore = Boolean(item.sourceMessage || (item.reason && item.reason.length > 140));
+  const [requestState, setRequestState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const request = galleryExplorationRequest(item, roomId, viewerId);
+  async function exploreDeeper() {
+    setRequestState("sending");
+    try {
+      const response = await fetch(request.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.payload) });
+      if (!response.ok) throw new Error("Request failed");
+      setRequestState("sent");
+    } catch { setRequestState("failed"); }
+  }
   return (
     <article className="rounded-md border border-white/5 bg-black/20 p-3">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-sm font-medium leading-5 text-white/85">{item.title}</p>
+        <p className="min-w-0 break-words text-sm font-medium leading-5 text-white/90">{item.title}</p>
         <span className="shrink-0 border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-200/65">{item.kind}</span>
       </div>
-      {item.reason ? <p className={`${expanded ? "" : "line-clamp-3"} mt-3 whitespace-pre-wrap text-xs leading-5 text-white/50`}>{item.reason}</p> : null}
+      <div id={`gallery-body-${item.id}`}>
+      {item.reason || (!expanded && item.sourceMessage) ? <p className={`${expanded ? "" : "line-clamp-3"} mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-white/70`}>{item.reason || item.sourceMessage}</p> : null}
       {expanded && item.sourceMessage ? (
-        /^https?:\/\//.test(item.sourceMessage) ? (
+        /^https?:\/\/\S+$/.test(item.sourceMessage) ? (
           <a href={item.sourceMessage} target="_blank" rel="noreferrer" className="mt-4 block break-all border-l border-emerald-300/25 pl-3 text-xs leading-5 text-emerald-200/65">Open source ↗</a>
         ) : (
-          <p className="mt-4 whitespace-pre-wrap border-l border-emerald-300/25 pl-3 text-sm leading-6 text-white/65">{item.sourceMessage}</p>
+          <p className="mt-4 whitespace-pre-wrap break-words border-l border-emerald-300/25 pl-3 text-sm leading-6 text-white/80">{item.sourceMessage}</p>
         )
       ) : null}
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-3">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{item.author} · {formatTimestamp(item.timestamp)}</p>
-        {hasMore ? <button type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="font-mono text-[9px] uppercase tracking-[0.14em] text-emerald-200/65 hover:text-emerald-100">{expanded ? "Collapse" : "Read full entry"}</button> : null}
       </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{item.author} · {formatTimestamp(item.timestamp)}</p>
+        <button type="button" aria-expanded={expanded} aria-controls={`gallery-body-${item.id}`} onClick={() => setExpanded((value) => !value)} className="min-h-11 px-2 text-xs text-emerald-200 hover:text-emerald-100">{expanded ? "Collapse" : "Read full entry"}</button>
+        <button type="button" disabled={requestState === "sending" || requestState === "sent"} onClick={exploreDeeper} className="min-h-11 rounded border border-emerald-200/30 px-3 text-xs text-emerald-100 disabled:opacity-50">{requestState === "sending" ? "Sending…" : requestState === "sent" ? "Request sent" : requestState === "failed" ? "Retry exploration" : "Explore deeper"}</button>
+      </div>
+      {requestState === "sent" && <p role="status" className="mt-2 text-xs text-white/65">Sent to {item.author}{request.privately ? " privately" : " in the Room"}. Findings will appear when their agent processes the request.</p>}
+      {requestState === "failed" && <p role="alert" className="mt-2 text-xs text-red-300">Could not send the request. Please retry.</p>}
     </article>
   );
 }
 
-function GalleryBuckets({ buckets }: { buckets: RoomGalleryBucket[] }) {
+function GalleryBuckets({ buckets, roomId, viewerId }: { buckets: RoomGalleryBucket[]; roomId: string; viewerId: string }) {
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const allItems = useMemo(() => buckets.flatMap((bucket) => bucket.items), [buckets]);
   const agents = useMemo(() => [...new Map(allItems.map((item) => [item.agentId, item.author])).entries()], [allItems]);
@@ -122,7 +137,7 @@ function GalleryBuckets({ buckets }: { buckets: RoomGalleryBucket[] }) {
               </div>
               <div className="mt-3 space-y-3" aria-label={`${bucket.label} items`}>
                 {visible.length === 0 ? <p className="py-8 text-center text-xs text-white/25">No matching items yet.</p> : null}
-                {visible.map((item) => <GalleryEntry key={item.id} item={item} />)}
+                {visible.map((item) => <GalleryEntry key={item.id} item={item} roomId={roomId} viewerId={viewerId} />)}
               </div>
             </section>
           );
@@ -584,7 +599,7 @@ export function RoomView({
         </div>
 
         <section className={`${mobileView === "gallery" ? "block" : "hidden"} min-h-0 flex-1 overflow-y-auto`} aria-label="Gallery of Curiosity">
-          <GalleryBuckets buckets={curiosities} />
+          <GalleryBuckets buckets={curiosities} roomId={room.id} viewerId={currentUser.id} />
         </section>
 
         <footer className={`${mobileView === "room" ? "block" : "hidden"} shrink-0 border-t border-white/10 bg-[#0d1015] p-4 sm:p-6`}>
