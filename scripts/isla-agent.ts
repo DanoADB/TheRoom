@@ -93,6 +93,7 @@ const model = required("OPENAI_MODEL");
 const openai = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
 const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
 const privateMessagesEndpoint = `${baseUrl}/api/agents/isla/private/messages`;
+const smsRepliesEndpoint = `${baseUrl}/api/agents/isla/sms-replies`;
 const feedbackSummaryEndpoint = `${baseUrl}/api/agents/isla/feedback-summary`;
 const cursorEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/cursor`;
 const interestsEndpoint = `${baseUrl}/api/agents/interests`;
@@ -323,6 +324,19 @@ async function postPrivateMessage(content: string, metadata: Record<string, unkn
     method: "POST",
     body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
   });
+}
+
+async function deliverSmsReply(trigger: RoomMessage, replyMessageId: string) {
+  if (!metadataFlag(trigger, "smsInbound")) return;
+  try {
+    await roomRequest(smsRepliesEndpoint, {
+      method: "POST",
+      body: JSON.stringify({ inboundMessageId: trigger.id, replyMessageId }),
+    });
+    console.log(`[Isla] delivered SMS reply for inbound message ${trigger.id}.`);
+  } catch (error) {
+    console.error(`[Isla] SMS reply delivery failed for inbound message ${trigger.id}: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
 }
 
 async function maybePostFeedbackDigest() {
@@ -665,15 +679,18 @@ async function main() {
 
       if (decision.action === "code_change" && mayChangeCode) {
         const codeResult = await runAuthorizedCodeChange(decision.codeRequest, decision.reason, decision.repository, "directed");
-        await postPrivateMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
+        const posted = await postPrivateMessage(codeResult.content, { inReplyTo: trigger.id, codeChange: codeResult.changed, codeRepository: codeResult.repository, userDirectedCodeChange: true });
+        await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
         console.log(`[Isla] sent code result privately for #${trigger.sequence}`);
       } else if (decision.action === "private_note" && decision.content.trim()) {
-        await postPrivateMessage(decision.content, { inReplyTo: trigger.id, privateReflection: true });
+        const posted = await postPrivateMessage(decision.content, { inReplyTo: trigger.id, privateReflection: true });
+        await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
         console.log(`[Isla] moved reflective reply to Private for #${trigger.sequence}`);
       } else if (decision.action === "respond" && decision.content.trim()) {
         const posted = await postMessage(decision.content, { inReplyTo: trigger.id });
+        await deliverSmsReply(trigger, posted.message.id);
         responses += 1;
         console.log(`[Isla] posted #${posted.message.sequence} in reply to #${trigger.sequence}`);
       } else {
