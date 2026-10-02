@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const observationKind = z.enum(["INTEREST", "RESEARCH", "BEHAVIOR", "SELF_CHANGE"]);
+export const observationPriority = z.enum(["GALLERY_WORTHY", "NEEDS_IMPLEMENTATION", "INTERESTING_BUT_NOT_YET_WORTH_CHANGING"]);
 
 export const agentObservationSchema = z.object({
   roomId: z.uuid(),
@@ -8,7 +9,13 @@ export const agentObservationSchema = z.object({
   title: z.string().trim().min(2).max(140),
   reason: z.string().trim().min(3).max(280),
   body: z.string().trim().min(3).max(8_000),
+  priority: observationPriority.optional(),
 }).strict();
+
+export const observationUpdateSchema = agentObservationSchema.omit({ roomId: true }).partial().extend({
+  roomId: z.uuid(),
+  id: z.uuid(),
+}).strict().refine((value) => Object.keys(value).some((key) => key !== "roomId" && key !== "id"), "Supply at least one field to update.");
 
 export const messageObservationSchema = agentObservationSchema.omit({ roomId: true }).partial({ reason: true });
 

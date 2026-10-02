@@ -77,6 +77,7 @@ export function PrivateIslaView({ initialMessages, viewerId }: { initialMessages
         <nav className="mt-8 space-y-1 text-sm" aria-label="Primary navigation">
           <a href="/room" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Conversation</a>
           <a href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Activity</a>
+          <a href="/room?view=gallery" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Gallery</a>
           <a href="/governance" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Threshold & culture</a>
           <a href="/private" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Private with Isla</a>
         </nav>
