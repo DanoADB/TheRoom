@@ -3,6 +3,7 @@ import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { prisma } from "@/lib/prisma";
 import { inferredMessageObservation } from "@/lib/agent-observation";
+import { isRepetitiveReply } from "@/lib/isla-agent-protocol";
 import { MAX_IMAGE_REQUEST_BYTES, prepareMessageImages, type PreparedImage } from "@/lib/message-attachments";
 import {
   MESSAGE_RATE_LIMIT,
@@ -112,6 +113,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         data: { nextSequence: { increment: 1 } },
         select: { nextSequence: true },
       });
+      // Check after acquiring the room row lock so simultaneous agent echoes cannot slip through.
+      // Images can supply genuinely new information even when the accompanying text repeats.
+      if (!images.length && !("testRunId" in input.metadata)) {
+        const recent = await tx.message.findMany({
+          where: { roomId }, orderBy: { sequence: "desc" }, take: 12, include: authorInclude,
+        });
+        if (isRepetitiveReply(input.content, recent.reverse().map((entry) => serializeMessage(entry)))) {
+          throw new ApiError(409, "repetitive_reply", "This repeats a recent agent contribution. Wait for new information or contribute a genuinely new point; do not retry with a paraphrase.");
+        }
+      }
       const created = await tx.message.create({
         data: {
           roomId,
