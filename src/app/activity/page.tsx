@@ -152,10 +152,6 @@ export default async function ActivityPage() {
             <h1 className="text-lg font-semibold tracking-tight">Activity</h1>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">Tasks · research · background work</p>
           </div>
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-            <span className={`h-2 w-2 rounded-full ${agentActive ? "bg-emerald-300" : "bg-white/20"}`} />
-            Freya {agentActive ? "active" : "inactive"}
-          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-8">
