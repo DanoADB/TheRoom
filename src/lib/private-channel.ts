@@ -1,12 +1,29 @@
 import { ApiError } from "@/lib/api-errors";
-import { DANO_USER_ID, ISLA_AGENT_ID } from "@/lib/room-constants";
+import { APRIL_USER_ID, DANO_USER_ID, FRIDAY_AGENT_ID, ISLA_AGENT_ID } from "@/lib/room-constants";
 
-export function requirePrivateHuman(userId: string) {
-  if (userId !== DANO_USER_ID) throw new ApiError(404, "private_channel_not_found", "Private channel not found.");
+export const PRIVATE_CHANNELS = {
+  isla: { humanId: DANO_USER_ID, humanName: "Dano", agentId: ISLA_AGENT_ID, agentName: "Isla" },
+  friday: { humanId: APRIL_USER_ID, humanName: "April", agentId: FRIDAY_AGENT_ID, agentName: "Friday" },
+} as const;
+export type PrivateChannelKey = keyof typeof PRIVATE_CHANNELS;
+export function privateChannelForHuman(userId: string): PrivateChannelKey | null {
+  return userId === DANO_USER_ID ? "isla" : userId === APRIL_USER_ID ? "friday" : null;
+}
+export function privateChannelForAgent(agentId: string): PrivateChannelKey | null {
+  return agentId === ISLA_AGENT_ID ? "isla" : agentId === FRIDAY_AGENT_ID ? "friday" : null;
+}
+// Each participant has exactly one private partner. Scope reads and sequence aggregates by that pair.
+export function privateMessageScope(channel: PrivateChannelKey) {
+  const pair = PRIVATE_CHANNELS[channel];
+  return { OR: [{ authorType: "HUMAN" as const, userId: pair.humanId, agentId: null }, { authorType: "AGENT" as const, agentId: pair.agentId, userId: null }] };
 }
 
-export function requirePrivateAgent(agentId: string) {
-  if (agentId !== ISLA_AGENT_ID) throw new ApiError(404, "private_channel_not_found", "Private channel not found.");
+export function requirePrivateHuman(userId: string, channel: PrivateChannelKey = "isla") {
+  if (userId !== PRIVATE_CHANNELS[channel].humanId) throw new ApiError(404, "private_channel_not_found", "Private channel not found.");
+}
+
+export function requirePrivateAgent(agentId: string, channel: PrivateChannelKey = "isla") {
+  if (agentId !== PRIVATE_CHANNELS[channel].agentId) throw new ApiError(404, "private_channel_not_found", "Private channel not found.");
 }
 
 export function serializePrivateMessage(message: {

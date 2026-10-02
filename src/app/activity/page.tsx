@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { AgentInterestList } from "@/lib/agent-curiosity";
 import { getCurrentHuman } from "@/lib/human-auth";
 import { prisma } from "@/lib/prisma";
-import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
+import { MVP_ROOM_ID } from "@/lib/room-constants";
+import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 import { ActivityRefresh } from "./activity-refresh";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
 
@@ -47,6 +48,7 @@ function formatTime(value: Date | null) {
 export default async function ActivityPage() {
   const user = await getCurrentHuman();
   if (!user) redirect("/login");
+  const privateChannel = privateChannelForHuman(user.id);
 
   const membership = await prisma.roomMembership.findUnique({
     where: { roomId_userId: { roomId: MVP_ROOM_ID, userId: user.id } },
@@ -129,7 +131,7 @@ export default async function ActivityPage() {
           <Link href="/room" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Conversation</Link>
           <Link href="/activity" aria-current="page" className="block border-l border-emerald-300 px-3 py-2 text-emerald-200">Activity</Link>
           <Link href="/room?view=gallery" className="block border-l border-transparent px-3 py-2 text-white/40 hover:text-white/75">Gallery</Link>
-          {user.id === DANO_USER_ID ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
+          {privateChannel ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with {PRIVATE_CHANNELS[privateChannel].agentName}</Link> : null}
         </nav>
         <div className="mt-12 border-t border-white/10 pt-6">
           <p className="text-xs uppercase tracking-[0.18em] text-white/30">Runtime</p>
@@ -248,7 +250,7 @@ export default async function ActivityPage() {
         </div>
 
       </section>
-      <RoomMobileNav current="activity" viewerId={user.id} showPrivate={user.id === DANO_USER_ID} />
+      <RoomMobileNav current="activity" viewerId={user.id} showPrivate={privateChannel !== null} />
     </main>
   );
 }

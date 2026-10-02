@@ -5,10 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { DANO_USER_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { GovernancePanel } from "./governance-panel";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
+import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 
 export default async function GovernancePage() {
   const user = await getCurrentHuman();
   if (!user) redirect("/login");
+  const privateChannel = privateChannelForHuman(user.id);
   const membership = await prisma.roomMembership.findUnique({ where: { roomId_userId: { roomId: MVP_ROOM_ID, userId: user.id } } });
   if (!membership) redirect("/login");
 
@@ -48,7 +50,7 @@ export default async function GovernancePage() {
           </div>
           <Link href="/room" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Room</Link>
           <Link href="/room?view=gallery" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Gallery</Link>
-          {user.id === DANO_USER_ID ? <Link href="/private" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Private with Isla</Link> : null}
+          {privateChannel ? <Link href="/private" className="border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white">Private with {PRIVATE_CHANNELS[privateChannel].agentName}</Link> : null}
         </div>
 
         {user.id === DANO_USER_ID ? <div className="mt-8"><GovernancePanel invitations={invitations.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), createdAt: item.createdAt.toISOString() }))} /></div> : null}
@@ -80,7 +82,7 @@ export default async function GovernancePage() {
           </div>
         </section>
       </div>
-      <RoomMobileNav current="culture" viewerId={user.id} showPrivate={user.id === DANO_USER_ID} />
+      <RoomMobileNav current="culture" viewerId={user.id} showPrivate={privateChannel !== null} />
     </main>
   );
 }
