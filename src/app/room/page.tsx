@@ -28,6 +28,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
               displayName: true,
               type: true,
               status: true,
+              inStudy: true,
               curiosity: { select: { interests: true, updatedAt: true } },
               gallery: {
                 where: { steerAway: false },
@@ -73,7 +74,7 @@ export default async function RoomPage({ searchParams }: PageProps<"/room">) {
       id: participant.id,
       displayName: participant.displayName,
       type: participant.type.toLowerCase() as "human" | "agent",
-      status: membership.agent?.status.toLowerCase() ?? "present",
+      status: membership.agent?.inStudy ? "study" : membership.agent?.status.toLowerCase() ?? "present",
     };
   });
 

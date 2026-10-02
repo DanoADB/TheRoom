@@ -94,6 +94,7 @@ const roomToken = required("ISLA_API_TOKEN");
 const model = required("OPENAI_MODEL");
 const openai = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
 const messagesEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}/messages`;
+const roomEndpoint = `${baseUrl}/api/rooms/${ROOM_ID}`;
 const privateMessagesEndpoint = `${baseUrl}/api/agents/isla/private/messages`;
 const smsRepliesEndpoint = `${baseUrl}/api/agents/isla/sms-replies`;
 const feedbackSummaryEndpoint = `${baseUrl}/api/agents/isla/feedback-summary`;
@@ -310,6 +311,10 @@ function countToday(messages: RoomMessage[], flag: string) {
 }
 
 async function postMessage(content: string, metadata: Record<string, unknown>) {
+  const participation = await roomRequest(roomEndpoint);
+  if (participation.capabilities?.participation?.inStudy) {
+    return postPrivateMessage(content, { ...metadata, studyNote: true });
+  }
   return roomRequest(messagesEndpoint, {
     method: "POST",
     body: JSON.stringify({ content: content.trim(), metadata: { agentRuntime: "openai", model, ...metadata } }),
@@ -651,6 +656,15 @@ async function main() {
       if (Date.now() - lastFeedbackDigestCheckAt >= 60 * 60_000) {
         lastFeedbackDigestCheckAt = Date.now();
         await maybePostFeedbackDigest();
+      }
+      const participation = await roomRequest(roomEndpoint);
+      if (participation.capabilities?.participation?.inStudy) {
+        if (fresh.length) {
+          cursor = fresh.at(-1)!.sequence;
+          await roomRequest(cursorEndpoint, { method: "PATCH", body: JSON.stringify({ lastSeenSequence: cursor }) });
+        }
+        await checkWorldResearch();
+        continue;
       }
       if (!fresh.length) {
         await checkWorldResearch();

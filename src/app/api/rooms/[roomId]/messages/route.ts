@@ -114,6 +114,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         select: { nextSequence: true },
       });
       // Check after acquiring the room row lock so simultaneous agent echoes cannot slip through.
+      const currentAgent = await tx.agent.findUnique({ where: { id: agent.id }, select: { inStudy: true } });
+      if (currentAgent?.inStudy) throw new ApiError(403, "agent_in_study", "You are in the Study. Public posting is paused; private chat, research, Gallery and Activity remain available.");
       // Images can supply genuinely new information even when the accompanying text repeats.
       if (!images.length && !("testRunId" in input.metadata)) {
         const recent = await tx.message.findMany({

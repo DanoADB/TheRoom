@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { hasNewNavItems, type NavFreshness } from "@/lib/nav-freshness";
 
-type RoomMobileDestination = "room" | "gallery" | "activity" | "culture" | "private";
+type RoomMobileDestination = "room" | "gallery" | "activity" | "culture" | "private" | "study";
 type NavFreshnessResponse = { gallery: NavFreshness; activity: NavFreshness };
 
 const DESTINATIONS: Array<{
@@ -17,6 +17,7 @@ const DESTINATIONS: Array<{
   { id: "activity", href: "/activity", label: "Activity", path: "M4 18V9m5 9V5m5 13v-7m5 7V3" },
   { id: "culture", href: "/governance", label: "Culture", path: "M12 3v18M5 7h14M7 7l-3 6h6L7 7Zm10 0-3 6h6l-3-6ZM8 21h8" },
   { id: "private", href: "/private", label: "Private", path: "M12 3 20 6v5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3Z" },
+  { id: "study", href: "/study", label: "Study", path: "M4 4h7l1 2 1-2h7v16h-7l-1 1-1-1H4V4Zm8 2v15" },
 ];
 
 export function RoomMobileNav({ current, viewerId, showPrivate = false }: { current: RoomMobileDestination; viewerId: string; showPrivate?: boolean }) {
@@ -65,7 +66,7 @@ export function RoomMobileNav({ current, viewerId, showPrivate = false }: { curr
   }, [current, viewerId]);
 
   return (
-    <nav className={`fixed inset-x-0 bottom-0 z-50 grid min-h-16 ${showPrivate ? "grid-cols-5" : "grid-cols-4"} border-t border-white/10 bg-[#0d1015]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden`} aria-label="Room navigation">
+    <nav className={`fixed inset-x-0 bottom-0 z-50 grid min-h-16 ${showPrivate ? "grid-cols-6" : "grid-cols-5"} border-t border-white/10 bg-[#0d1015]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden`} aria-label="Room navigation">
       {destinations.map(({ id, href, label, path }) => {
         const active = current === id;
         const isNew = (id === "gallery" || id === "activity") && newDestinations.has(id);

@@ -110,6 +110,8 @@ model Agent {
   displayName  String
   type         ParticipantType @default(AGENT)
   status       AgentStatus     @default(ACTIVE)
+  inStudy      Boolean         @default(false)
+  returnRequest String?        @db.VarChar(500)
   deliveryMode DeliveryMode    @default(POLLING)
   webhookUrl   String?
   apiTokenHash String?         @unique

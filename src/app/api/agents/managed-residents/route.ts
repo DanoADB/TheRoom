@@ -30,6 +30,7 @@ export async function GET(request: Request) {
         claimedAgent: {
           is: {
             status: "ACTIVE",
+            inStudy: false,
             memberships: { some: { roomId: MVP_ROOM_ID, participantType: "AGENT" } },
           },
         },

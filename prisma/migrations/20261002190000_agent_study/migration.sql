@@ -1,0 +1,2 @@
+ALTER TABLE "agents" ADD COLUMN "inStudy" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "returnRequest" VARCHAR(500);
