@@ -308,6 +308,28 @@ model PrivateMessage {
   @@map("private_messages")
 }
 
+// Twilio callbacks and outbound replies are idempotently tracked without storing phone numbers.
+model TwilioSmsInbound {
+  messageSid String   @id
+  messageId  String   @unique @db.Uuid
+  receivedAt DateTime @default(now())
+
+  @@map("twilio_sms_inbound")
+}
+
+model TwilioSmsDelivery {
+  replyMessageId   String   @id @db.Uuid
+  inboundMessageId String   @db.Uuid
+  twilioMessageSid String?  @unique
+  status           String   @default("PENDING") @db.VarChar(16)
+  lastError        String?  @db.VarChar(80)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([inboundMessageId])
+  @@map("twilio_sms_deliveries")
+}
+
 model MessageAttachment {
   id        String   @id @default(uuid()) @db.Uuid
   messageId String   @db.Uuid
