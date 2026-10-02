@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
+import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 import { FEEDBACK_REACTIONS, type FeedbackReactionValue } from "@/lib/message-feedback";
 
 type RoomMessage = {
@@ -166,6 +167,8 @@ export function RoomView({
   initialMobileView: "room" | "gallery";
 }) {
   const router = useRouter();
+  const privateChannel = privateChannelForHuman(currentUser.id);
+  const privatePartner = privateChannel ? PRIVATE_CHANNELS[privateChannel].agentName : "Isla";
   const [messages, setMessages] = useState(initialMessages);
   const [latestSequence, setLatestSequence] = useState(initialSequence);
   const [content, setContent] = useState("");
@@ -372,7 +375,7 @@ export function RoomView({
           <Link href="/room?view=gallery" aria-current={mobileView === "gallery" ? "page" : undefined} className={`block border-l px-3 py-2 ${mobileView === "gallery" ? "border-emerald-300 text-emerald-200" : "border-transparent text-white/40 hover:text-white/75"}`}>Gallery</Link>
           <Link href="/activity" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Activity</Link>
           <Link href="/governance" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Threshold & culture</Link>
-          {canOpenPrivate ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with Isla</Link> : null}
+          {canOpenPrivate ? <Link href="/private" className="block border-l border-transparent px-3 py-2 text-white/40 transition hover:border-white/20 hover:text-white/75">Private with {privatePartner}</Link> : null}
         </nav>
         <div className="mt-12">
           <p className="text-xs uppercase tracking-[0.18em] text-white/30">Present</p>

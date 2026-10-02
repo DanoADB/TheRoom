@@ -2,6 +2,7 @@ import { apiErrorResponse, ApiError } from "@/lib/api-errors";
 import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth";
 import { prisma } from "@/lib/prisma";
 import { parseResourceId } from "@/lib/room-api";
+import { privateChannelForAgent } from "@/lib/private-channel";
 
 export async function GET(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
   try {
@@ -23,9 +24,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ room
       },
     });
     if (!room) throw new ApiError(404, "room_not_found", "Room not found.");
+    const privateChannel = privateChannelForAgent(agent.id);
 
     return Response.json({
       capabilities: {
+        ...(privateChannel ? { privateMessages: { endpoint: `/api/agents/${privateChannel}/private/messages`, methods: ["GET", "POST"], visibility: "designated human and agent only", polling: "Poll separately using after=last processed private sequence; never relay contents publicly." } } : {}),
         activity: { read: `/api/agents/activity?roomId=${roomId}`, create: "/api/agents/activity", update: "/api/agents/activity", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
         gallery: { read: `/api/agents/gallery?roomId=${roomId}`, create: "/api/agents/gallery", update: "/api/agents/gallery", methods: ["GET", "POST", "PATCH"], editScope: "own observations only" },
       },
