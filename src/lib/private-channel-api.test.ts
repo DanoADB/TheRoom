@@ -10,6 +10,8 @@ import { GET as humanFriday, POST as postHumanFriday } from "@/app/api/human/fri
 import { GET as agentFriday, POST as postAgentFriday } from "@/app/api/agents/friday/private/messages/route";
 import { GET as humanIsla } from "@/app/api/human/isla/private/messages/route";
 import { GET as agentIsla } from "@/app/api/agents/isla/private/messages/route";
+import { GET as sessionIsla, POST as postSessionIsla } from "@/app/api/agents/isla-session/private/messages/route";
+import { POST as postHumanSession } from "@/app/api/human/isla-session/private/messages/route";
 const get = () => new Request("https://room.test/private?after=12");
 const post = () => new Request("https://room.test/private", { method: "POST", body: JSON.stringify({ content: "Hello privately", metadata: {} }) });
 beforeEach(() => {
@@ -19,6 +21,19 @@ beforeEach(() => {
   mocks.create.mockImplementation(async ({ data }) => ({ ...data, id: "message", sequence: 20, createdAt: new Date(), user: data.userId ? { id: data.userId, displayName: "April", type: "HUMAN" } : null, agent: data.agentId ? { id: data.agentId, displayName: "Friday", type: "AGENT" } : null }));
 });
 describe("private channel endpoint isolation", () => {
+  it("separates Dano's new Isla conversation on both reads and writes", async () => {
+    mocks.agent.mockResolvedValue({ id: "5c6a994f-00ab-4bc8-bbc8-5d33603939b4" });
+    mocks.human.mockResolvedValue({ id: DANO_USER_ID });
+    expect((await sessionIsla(get())).status).toBe(200);
+    expect(mocks.find).toHaveBeenLastCalledWith(expect.objectContaining({ where: { ...privateMessageScope("isla-session"), sequence: { gt: 12 } } }));
+    for (const write of [postSessionIsla, postHumanSession]) {
+      expect((await write(post())).status).toBe(201);
+      expect(mocks.create).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "isla-session" }) }));
+    }
+    expect((await agentIsla(get())).status).toBe(404);
+    mocks.agent.mockResolvedValue({ id: ISLA_AGENT_ID });
+    expect((await sessionIsla(get())).status).toBe(404);
+  });
   it("April and Friday read only their pair, including the sequence aggregate", async () => {
     for (const read of [humanFriday, agentFriday]) {
       const response = await read(get()); expect(response.status).toBe(200);

@@ -1,8 +1,8 @@
-import { privateChannelForHuman, PRIVATE_CHANNELS } from "./private-channel";
+import { privateChannelsForHuman, PRIVATE_CHANNELS } from "./private-channel";
 
 export function galleryExplorationRequest(item: { id: string; agentId: string; author: string; title: string; reason: string | null; sourceMessage: string | null }, roomId: string, viewerId: string) {
-  const channel = privateChannelForHuman(viewerId);
-  const privately = channel !== null && PRIVATE_CHANNELS[channel].agentId === item.agentId;
+  const channel = privateChannelsForHuman(viewerId).find(key => PRIVATE_CHANNELS[key].agentId === item.agentId);
+  const privately = channel !== undefined;
   const context = [item.reason, item.sourceMessage].filter(Boolean).join("\n\n").slice(0, 6000);
   return {
     endpoint: privately ? `/api/human/${channel}/private/messages` : `/api/human/rooms/${roomId}/messages`,

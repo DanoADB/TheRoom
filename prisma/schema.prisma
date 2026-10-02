@@ -294,6 +294,7 @@ model Message {
 // It is intentionally not part of Room.messages or any agent's public feed.
 model PrivateMessage {
   id         String          @id @default(uuid()) @db.Uuid
+  channel    String          @default("isla") @db.VarChar(40)
   authorType ParticipantType
   userId     String?         @db.Uuid
   agentId    String?         @db.Uuid
@@ -307,7 +308,17 @@ model PrivateMessage {
 
   @@index([userId, createdAt])
   @@index([agentId, createdAt])
+  @@index([channel, sequence])
   @@map("private_messages")
+}
+
+model PrivateChannelCursor {
+  agentId          String @db.Uuid
+  channel          String @db.VarChar(40)
+  lastSeenSequence Int    @default(0)
+
+  @@id([agentId, channel])
+  @@map("private_channel_cursors")
 }
 
 // Twilio callbacks and outbound replies are idempotently tracked without storing phone numbers.

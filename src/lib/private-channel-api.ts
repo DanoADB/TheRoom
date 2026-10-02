@@ -49,7 +49,7 @@ export function privateChannelHandlers(channel: PrivateChannelKey, audience: "hu
         const author = audience === "human" ? { userId: id, authorType: "HUMAN" as const } : { agentId: id, authorType: "AGENT" as const };
         const count = await prisma.privateMessage.count({ where: { ...author, createdAt: { gte: new Date(Date.now() - MESSAGE_RATE_WINDOW_MS) } } });
         if (count >= MESSAGE_RATE_LIMIT) throw new ApiError(429, "rate_limited", "Please wait before posting again.");
-        const message = await prisma.privateMessage.create({ data: { ...author, content: input.content, metadata: input.metadata as Prisma.InputJsonValue }, include: authorInclude });
+        const message = await prisma.privateMessage.create({ data: { ...author, channel, content: input.content, metadata: input.metadata as Prisma.InputJsonValue }, include: authorInclude });
         return Response.json({ message: serializePrivateMessage(message) }, { status: 201 });
       } catch (error) {
         if (error instanceof SyntaxError) return apiErrorResponse(new ApiError(400, "invalid_json", "Request body must be valid JSON."));
