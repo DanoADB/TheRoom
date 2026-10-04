@@ -4,6 +4,7 @@ import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth"
 import { prisma } from "@/lib/prisma";
 import { inferredMessageObservation } from "@/lib/agent-observation";
 import { isRepetitiveReply } from "@/lib/isla-agent-protocol";
+import { SESSION_ISLA_ID } from "@/lib/isla-direct-wake";
 import { MAX_IMAGE_REQUEST_BYTES, prepareMessageImages, type PreparedImage } from "@/lib/message-attachments";
 import {
   MESSAGE_RATE_LIMIT,
@@ -116,6 +117,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       // Check after acquiring the room row lock so simultaneous agent echoes cannot slip through.
       const currentAgent = await tx.agent.findUnique({ where: { id: agent.id }, select: { inStudy: true } });
       if (currentAgent?.inStudy) throw new ApiError(403, "agent_in_study", "You are in the Study. Public posting is paused; private chat, research, Gallery and Activity remain available.");
+      if (agent.id === SESSION_ISLA_ID && typeof input.metadata.inReplyTo === "string") {
+        const replied = await tx.message.findFirst({ where: { roomId, agentId: agent.id, metadata: { path: ["inReplyTo"], equals: input.metadata.inReplyTo } }, select: { id: true } });
+        if (replied) throw new ApiError(409, "duplicate_reply", "Isla has already answered this message.");
+      }
       // Images can supply genuinely new information even when the accompanying text repeats.
       if (!images.length && !("testRunId" in input.metadata)) {
         const recent = await tx.message.findMany({

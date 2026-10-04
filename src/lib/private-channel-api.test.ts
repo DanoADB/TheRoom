@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-errors";
 import { APRIL_USER_ID, DANO_USER_ID, FRIDAY_AGENT_ID, ISLA_AGENT_ID } from "./room-constants";
 import { privateMessageScope } from "./private-channel";
-const mocks = vi.hoisted(() => ({ human: vi.fn(), origin: vi.fn(), agent: vi.fn(), agentMembership: vi.fn(), member: vi.fn(), find: vi.fn(), aggregate: vi.fn(), count: vi.fn(), create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ human: vi.fn(), origin: vi.fn(), agent: vi.fn(), agentMembership: vi.fn(), member: vi.fn(), find: vi.fn(), aggregate: vi.fn(), count: vi.fn(), create: vi.fn(), first: vi.fn(), lock: vi.fn() }));
 vi.mock("@/lib/human-auth", () => ({ requireHuman: mocks.human, requireSameOrigin: mocks.origin }));
 vi.mock("@/lib/agent-auth", () => ({ authenticateAgent: mocks.agent, requireAgentRoomMembership: mocks.agentMembership }));
-vi.mock("@/lib/prisma", () => ({ prisma: { roomMembership: { findUnique: mocks.member }, privateMessage: { findMany: mocks.find, aggregate: mocks.aggregate, count: mocks.count, create: mocks.create } } }));
+vi.mock("@/lib/prisma", () => ({ prisma: { roomMembership: { findUnique: mocks.member }, privateMessage: { findMany: mocks.find, aggregate: mocks.aggregate, count: mocks.count, create: mocks.create }, $transaction: (callback: (tx: unknown) => unknown) => callback({ $queryRaw: mocks.lock, privateMessage: { findFirst: mocks.first, create: mocks.create } }) } }));
 import { GET as humanFriday, POST as postHumanFriday } from "@/app/api/human/friday/private/messages/route";
 import { GET as agentFriday, POST as postAgentFriday } from "@/app/api/agents/friday/private/messages/route";
 import { GET as humanIsla } from "@/app/api/human/isla/private/messages/route";
@@ -21,6 +21,15 @@ beforeEach(() => {
   mocks.create.mockImplementation(async ({ data }) => ({ ...data, id: "message", sequence: 20, createdAt: new Date(), user: data.userId ? { id: data.userId, displayName: "April", type: "HUMAN" } : null, agent: data.agentId ? { id: data.agentId, displayName: "Friday", type: "AGENT" } : null }));
 });
 describe("private channel endpoint isolation", () => {
+  it("serializes listener/heartbeat replies and refuses a second reply to the same trigger", async () => {
+    mocks.agent.mockResolvedValue({ id: "5c6a994f-00ab-4bc8-bbc8-5d33603939b4" });
+    mocks.first.mockResolvedValue({ id: "existing-reply" });
+    const request = new Request("https://room.test/private", { method: "POST", body: JSON.stringify({ content: "Another answer", metadata: { inReplyTo: "trigger" } }) });
+    expect((await postSessionIsla(request)).status).toBe(409);
+    expect(mocks.lock).toHaveBeenCalled();
+    expect(mocks.first).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: "isla-session", metadata: { path: ["inReplyTo"], equals: "trigger" } }) }));
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
   it("separates Dano's new Isla conversation on both reads and writes", async () => {
     mocks.agent.mockResolvedValue({ id: "5c6a994f-00ab-4bc8-bbc8-5d33603939b4" });
     mocks.human.mockResolvedValue({ id: DANO_USER_ID });
