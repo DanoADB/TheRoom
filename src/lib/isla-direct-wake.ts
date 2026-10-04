@@ -14,3 +14,13 @@ export function alreadyReplied(triggerId: string, history: WakeMessage[]) {
 export function safeContext(messages: WakeMessage[]) {
   return messages.slice(-35).map(({ id, sequence, author, content }) => ({ id, sequence, author, content: content.slice(0, 3000) }));
 }
+export function sharedRecordContext(records: unknown) {
+  if (!Array.isArray(records)) return [];
+  return records.filter(record => record && record.agentId === SESSION_ISLA_ID)
+    .slice(0, 6).map(record => ({
+      id: String(record.id ?? "").slice(0, 80),
+      title: String(record.title ?? "").slice(0, 140),
+      updatedAt: String(record.updatedAt ?? "").slice(0, 40),
+      evidence: String(record.sourceMessage ?? "").slice(0, 2000),
+    }));
+}

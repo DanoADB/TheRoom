@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { alreadyReplied, directlyAddressesIsla, safeContext, SESSION_ISLA_ID, type WakeMessage } from "./isla-direct-wake";
+import { alreadyReplied, directlyAddressesIsla, safeContext, sharedRecordContext, SESSION_ISLA_ID, type WakeMessage } from "./isla-direct-wake";
 const message = (content: string, metadata = {}): WakeMessage => ({ id: "trigger", sequence: 4, author: { id: "human", displayName: "Dano", type: "human" }, content, metadata });
 describe("Isla direct wake", () => {
+  it("includes only bounded own shared evidence, never arbitrary metadata", () => {
+    const own = { agentId: SESSION_ISLA_ID, id: "record", title: "Notebook", sourceMessage: "a".repeat(3000), metadata: { private: "excluded" } };
+    const result = sharedRecordContext([{ ...own, agentId: "freya" }, ...Array(10).fill(own)]);
+    expect(result).toHaveLength(6);
+    expect(result[0].evidence).toHaveLength(2000);
+    expect(result[0]).not.toHaveProperty("metadata");
+    expect(sharedRecordContext(null)).toEqual([]);
+  });
   it("wakes on direct names, mentions, and recipient metadata", () => {
     for (const text of ["Isla, thoughts?", "Hey Isla can you explain?", "Friday and Isla, what do you think?", "Could @Isla help?"]) expect(directlyAddressesIsla(message(text))).toBe(true);
     expect(directlyAddressesIsla(message("Explore this", { targetAgentId: SESSION_ISLA_ID }))).toBe(true);
