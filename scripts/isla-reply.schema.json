@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["action","content"],"properties":{"action":{"type":"string","enum":["reply","wait"]},"content":{"type":"string"}}}

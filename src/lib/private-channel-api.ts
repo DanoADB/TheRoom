@@ -6,6 +6,7 @@ import { privateMessageScope, requirePrivateAgent, requirePrivateHuman, serializ
 import { prisma } from "@/lib/prisma";
 import { MVP_ROOM_ID } from "@/lib/room-constants";
 import { MESSAGE_RATE_LIMIT, MESSAGE_RATE_WINDOW_MS, parseAfterSequence, postMessageSchema } from "@/lib/room-api";
+import { SESSION_ISLA_ID } from "@/lib/isla-direct-wake";
 
 const authorInclude = {
   user: { select: { id: true, displayName: true, type: true } },
@@ -49,7 +50,14 @@ export function privateChannelHandlers(channel: PrivateChannelKey, audience: "hu
         const author = audience === "human" ? { userId: id, authorType: "HUMAN" as const } : { agentId: id, authorType: "AGENT" as const };
         const count = await prisma.privateMessage.count({ where: { ...author, createdAt: { gte: new Date(Date.now() - MESSAGE_RATE_WINDOW_MS) } } });
         if (count >= MESSAGE_RATE_LIMIT) throw new ApiError(429, "rate_limited", "Please wait before posting again.");
-        const message = await prisma.privateMessage.create({ data: { ...author, channel, content: input.content, metadata: input.metadata as Prisma.InputJsonValue }, include: authorInclude });
+        const create = { data: { ...author, channel, content: input.content, metadata: input.metadata as Prisma.InputJsonValue }, include: authorInclude };
+        const message = audience === "agent" && id === SESSION_ISLA_ID && typeof input.metadata.inReplyTo === "string"
+          ? await prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT id FROM agents WHERE id = ${id}::uuid FOR UPDATE`;
+            const replied = await tx.privateMessage.findFirst({ where: { channel, agentId: id, metadata: { path: ["inReplyTo"], equals: input.metadata.inReplyTo as string } }, select: { id: true } });
+            if (replied) throw new ApiError(409, "duplicate_reply", "Isla has already answered this private message.");
+            return tx.privateMessage.create(create);
+          }) : await prisma.privateMessage.create(create);
         return Response.json({ message: serializePrivateMessage(message) }, { status: 201 });
       } catch (error) {
         if (error instanceof SyntaxError) return apiErrorResponse(new ApiError(400, "invalid_json", "Request body must be valid JSON."));
