@@ -150,6 +150,7 @@ export default async function ActivityPage() {
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d1015]/90 px-5 backdrop-blur sm:px-8">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Activity</h1>
+            <Link href="/experiments" className="text-sm text-emerald-200 underline underline-offset-4">Experiment notebook</Link>
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">Tasks · research · background work</p>
           </div>
         </header>
