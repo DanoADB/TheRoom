@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-errors";
 
 const mocks = vi.hoisted(() => ({
-  authenticate: vi.fn(), membership: vi.fn(), find: vi.fn(), create: vi.fn(), update: vi.fn(), messages: vi.fn(), members: vi.fn(),
+  authenticate: vi.fn(), membership: vi.fn(), find: vi.fn(), create: vi.fn(), update: vi.fn(), messages: vi.fn(), members: vi.fn(), priorities: vi.fn(),
 }));
 vi.mock("@/lib/agent-auth", () => ({ authenticateAgent: mocks.authenticate, requireAgentRoomMembership: mocks.membership }));
 vi.mock("@/lib/prisma", () => ({ prisma: {
   roomCuriosity: { findMany: mocks.find, create: mocks.create, updateMany: mocks.update },
   message: { findMany: mocks.messages }, roomMembership: { findMany: mocks.members },
+  activityPriority: { findMany: mocks.priorities },
 } }));
 import { GET as activity, POST, PATCH } from "@/app/api/agents/activity/route";
 import { GET as gallery } from "@/app/api/agents/gallery/route";
@@ -22,9 +23,15 @@ beforeEach(() => {
   vi.resetAllMocks(); mocks.authenticate.mockResolvedValue({ id: fridayId }); mocks.membership.mockResolvedValue({});
   mocks.find.mockResolvedValue([entry]); mocks.messages.mockResolvedValue([]); mocks.members.mockResolvedValue([]);
   mocks.create.mockResolvedValue({ id: entryId, createdAt: new Date() }); mocks.update.mockResolvedValue({ count: 1 });
+  mocks.priorities.mockResolvedValue([]);
 });
 
 describe("agent Activity and Gallery access", () => {
+  it("delivers human-raised records separately with human provenance", async () => {
+    mocks.priorities.mockResolvedValue([{ entryId: `observation:${entryId}`, raisedBy: "human", raisedAt: new Date("2026-10-05T21:00:00Z") }]);
+    const response = await activity(new Request(`https://room.test/api/agents/activity?roomId=${roomId}`));
+    expect((await response.json()).humanPriorities[0]).toMatchObject({ entryId: `observation:${entryId}`, raisedBy: "human", author: "Friday", body: "Evidence and findings" });
+  });
   it("lets Friday read shared activity and marks her observations editable", async () => {
     const response = await activity(new Request(`https://room.test/api/agents/activity?roomId=${roomId}`));
     expect(response.status).toBe(200);

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { ISLA_AGENT_ID, MVP_ROOM_ID } from "@/lib/room-constants";
 import { privateChannelForHuman, PRIVATE_CHANNELS } from "@/lib/private-channel";
 import { ActivityRefresh } from "./activity-refresh";
+import { RaisePriority } from "./raise-priority";
+import { raisedActivity } from "@/lib/activity-priority";
 import { RoomMobileNav } from "@/components/room-mobile-nav";
 
 function integerSetting(name: string, fallback: number) {
@@ -102,6 +104,8 @@ export default async function ActivityPage() {
       createdAt: message.createdAt,
     };
   });
+  const humanPriorities = await raisedActivity(MVP_ROOM_ID);
+  const raisedIds = new Set(humanPriorities.map(p => p.entryId));
   const recentActivity = [...observationActivity, ...messageActivity]
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .slice(0, 12);
@@ -157,6 +161,11 @@ export default async function ActivityPage() {
 
         <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-8">
           <div className="mx-auto max-w-5xl space-y-10">
+            <section aria-labelledby="raised-priority-title">
+              <h2 id="raised-priority-title" className="text-xl font-semibold">Raised priorities for Isla</h2>
+              <p className="mt-2 text-sm text-white/45">A human nudge for what to consider next—not permission to ignore safety, costs or scope. Raised items stay here until you undo them.</p>
+              {!humanPriorities.length ? <p className="mt-4 text-sm text-white/35">Use Raise Priority on an activity below.</p> : <ul className="mt-4 space-y-4">{humanPriorities.map(p => <li key={p.entryId} className="border border-amber-300/25 p-4"><p className="font-medium">{p.author} · {p.title}</p><p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-white/50">{p.body}</p><RaisePriority roomId={MVP_ROOM_ID} entryId={p.entryId} raised /></li>)}</ul>}
+            </section>
             <section aria-labelledby="background-work-title">
               <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-5">
                 <div>
@@ -227,7 +236,7 @@ export default async function ActivityPage() {
             <section aria-labelledby="recent-activity-title">
               <div className="border-b border-white/10 pb-5">
                 <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-amber-300/70">Recent trail</p>
-                <h2 id="recent-activity-title" className="mt-2 text-2xl font-semibold tracking-tight text-white/90">Completed activity</h2>
+                <h2 id="recent-activity-title" className="mt-2 text-2xl font-semibold tracking-tight text-white/90">Recent activity</h2>
               </div>
               <ol className="divide-y divide-white/10">
                 {recentActivity.length === 0 ? <li className="py-12 text-sm text-white/35">No background activity has been recorded yet.</li> : null}
@@ -237,6 +246,7 @@ export default async function ActivityPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-white/75">{activity.title}</p>
                         {activity.content ? <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-white/50">{activity.content}</p> : null}
+                        <RaisePriority roomId={MVP_ROOM_ID} entryId={activity.id} raised={raisedIds.has(activity.id)} />
                       </div>
                       <time className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">{formatTime(activity.createdAt)}</time>
                     </li>

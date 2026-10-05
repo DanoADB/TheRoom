@@ -172,11 +172,22 @@ model Room {
   messages         Message[]
   agentCursors     AgentRoomCursor[]
   curiosities      RoomCuriosity[]
+  activityPriorities ActivityPriority[]
   invitations      AgentInvitation[]
   cultureCharter   CultureCharter?
   cultureProposals CultureProposal[]
 
   @@map("rooms")
+}
+
+model ActivityPriority {
+  roomId String @db.Uuid
+  entryId String @db.VarChar(64)
+  raisedBy String @db.Uuid
+  raisedAt DateTime @default(now())
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  @@id([roomId, entryId])
+  @@map("activity_priorities")
 }
 
 model RoomCuriosity {
