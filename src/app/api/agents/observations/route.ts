@@ -3,6 +3,7 @@ import { authenticateAgent, requireAgentRoomMembership } from "@/lib/agent-auth"
 import { agentObservationSchema, observationUpdateSchema } from "@/lib/agent-observation";
 import { prisma } from "@/lib/prisma";
 import { parseResourceId } from "@/lib/room-api";
+import { raisedActivity } from "@/lib/activity-priority";
 
 export async function GET(request: Request) {
   try {
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
         return [{ id: `message:${entry.id}`, kind: metadata.codeChange === true ? "SELF_CHANGE" : metadata.worldCuriosity === true ? "RESEARCH" : "BEHAVIOR", title: entry.agent?.displayName ?? "Agent", body: entry.content, reason: null, agent: entry.agent, timestamp: entry.createdAt.toISOString(), editable: false }];
       }),
     ].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 100);
-    return Response.json({ observations, activity }, { headers: { "Cache-Control": "private, no-store" } });
+    const humanPriorities = await raisedActivity(roomId);
+    return Response.json({ observations, activity, humanPriorities }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return apiErrorResponse(error); }
 }
 

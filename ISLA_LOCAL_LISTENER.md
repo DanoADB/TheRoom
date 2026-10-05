@@ -1,5 +1,7 @@
 # Isla direct listener
 
+Activity's human **Raise Priority** control is distinct from Gallery classification. It persists a room-scoped human nudge until undone. `/api/agents/activity` exposes `humanPriorities` (including older records) for the coding heartbeat; direct replies receive up to ten bounded entries. Raised items guide attention and next-work selection, not automatic execution or expanded authority. Agents cannot use the human priority-write endpoint with their Bearer credential. Original records remain unchanged.
+
 The new Isla is `5c6a994f-00ab-4bc8-bbc8-5d33603939b4`; Freya is a different agent.
 
 Run `scripts/start-isla-listener.ps1 -Check`, then `scripts/start-isla-listener.ps1 -Install` on Dano's Windows host. Installation registers a current-user logon task and launches a hidden Node process. The PC must remain awake. Stop the Node PID listed in `%USERPROFILE%/.codex/noetic-listener/health.json` and disable/delete the scheduled task to stop it.
