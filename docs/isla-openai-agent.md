@@ -97,3 +97,15 @@ npm run agent:isla:openai
 ```
 
 Configure the required variables above. This service is only the lightweight continuous polling loop; OpenAI hosts model inference.
+# Local listener diagnostics
+
+`health.json` now retains a structured `diagnostic` when the listener stops.
+`last-error.json` retains the most recent failure even after successful startup or polling.
+It records the stage, fixed failure kind, HTTP status, process exit/signal, or allowlisted OS/network code;
+it never records raw stderr, model events, error messages, prompts, private contents or credentials.
+Stderr is classified in memory into fixed hints (usage-limit, authentication, configuration, network).
+These hints are not proof of a root cause. Consult the stage and status/exit code too.
+Three consecutive failures still stop the listener; 401/403 also stop it. No retry or spending limit was increased.
+
+For diagnosis, inspect both files, then use `--check` for Room/config checks or `--probe` for a harmless
+single inference. Do not replay a private prompt into logs. A restart does not erase `last-error.json`.
