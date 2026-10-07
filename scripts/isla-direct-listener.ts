@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, open, unlink, rename } from "node:fs/promis
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { ListenerFailure, safeFailure, stderrCategory, type Diagnostic } from "../src/lib/isla-listener-diagnostics";
+import { ListenerFailure, safeFailure, stderrCategory, retryableRoomFailure, type Diagnostic } from "../src/lib/isla-listener-diagnostics";
 import { buildImageReplyForm, imageReplySchema } from "../src/lib/isla-image-reply";
 import { alreadyReplied, directlyAddressesIsla, safeContext, sharedRecordContext, SESSION_ISLA_ID, type WakeMessage } from "../src/lib/isla-direct-wake";
 
@@ -197,8 +197,9 @@ async function main() {
         failures++;
         lastFailure = error instanceof HttpFailure ? { stage, kind: "http", status: error.status } : safeFailure(error, stage);
         await recordFailure(lastFailure, failures);
-        await health("error", { diagnostic: lastFailure, failures });
-        if ((error instanceof HttpFailure && [401, 403].includes(error.status)) || failures >= 3) throw new ListenerFailure(lastFailure);
+        const retryable = retryableRoomFailure(lastFailure);
+        await health(retryable ? "reconnecting" : "error", { diagnostic: lastFailure, failures });
+        if ((error instanceof HttpFailure && [401, 403].includes(error.status)) || (!retryable && failures >= 3)) throw new ListenerFailure(lastFailure);
       }
       await new Promise(accept => setTimeout(accept, Math.min(60000, 3000 * 2 ** Math.min(failures, 4))));
     }

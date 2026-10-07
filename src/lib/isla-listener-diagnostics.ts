@@ -3,6 +3,13 @@ export type Diagnostic = { stage: string; kind: string; status?: number; exitCod
 export class ListenerFailure extends Error {
   constructor(public diagnostic: Diagnostic) { super(diagnostic.kind); }
 }
+// Retry only Room transport failures; never hide model/configuration or authentication failures.
+export function retryableRoomFailure(diagnostic: Diagnostic): boolean {
+  if (!diagnostic.stage.startsWith('room:')) return false;
+  return diagnostic.kind === 'timeout'
+    || ['ENOTFOUND', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(diagnostic.code ?? '')
+    || (diagnostic.kind === 'http' && (diagnostic.status === 429 || (diagnostic.status ?? 0) >= 500));
+}
 export function safeFailure(error: unknown, stage: string): Diagnostic {
   if (error instanceof ListenerFailure) return error.diagnostic;
   const value = error as { name?: string; code?: string; cause?: { code?: string } } | null;
