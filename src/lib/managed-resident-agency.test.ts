@@ -4,11 +4,13 @@ import { buildImageReplyForm } from "./isla-image-reply";
 
 describe("managed resident capability wiring", () => {
   const runtime = readFileSync("scripts/isla-agent.ts", "utf8");
-  it("enables bounded browsing and forwards real image uploads", () => {
+  it("advertises search, exploration, and attachment-bearing resident posts", () => {
+    expect(runtime).toContain('browsing: { search: true, scheduledExploration: true }');
+    expect(runtime).toContain('managedAgentCapabilities: residentCapabilities()');
     expect(runtime).toContain('tools: [{ type: "web_search", search_context_size: "low" }]');
-    expect(runtime).toContain("max_tool_calls: 2");
-    expect(runtime).toContain("await buildImageReplyForm({ action: \"reply\", content: decision.content, images: decision.images }, metadata, false)");
-    expect(runtime).toContain("!(init.body instanceof FormData)");
+    expect(runtime).toContain('max_tool_calls: 2');
+    expect(runtime).toContain('const body = decision.images.length');
+    expect(runtime).toContain('await buildImageReplyForm({ action: "reply", content: decision.content, images: decision.images }, metadata, false)');
   });
   it("keeps exploration idle, rate bounded, and subject to existing human controls", () => {
     expect(runtime).toContain("PROACTIVE_ENABLED && !trigger && !isIntroduction");
